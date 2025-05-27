@@ -1757,6 +1757,12 @@ def healthcheck():
             'timestamp': datetime.now().isoformat()
         }), 200
 
+# Add a super simple healthcheck that doesn't depend on anything
+@app.route('/simple-health')
+def simple_healthcheck():
+    """Ultra-simple healthcheck for Railway - no dependencies"""
+    return "OK", 200
+
 @app.route('/debug-session')
 @login_required
 def debug_session():
