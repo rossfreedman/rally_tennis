@@ -306,13 +306,24 @@ def log_request_info():
 @app.route('/')
 def serve_index():
     """Serve the index page"""
-    print(f"Session at index: {session}")
-    if 'user' not in session:
-        print("No user in session, redirecting to login")
-        return redirect('/login')
+    try:
+        print(f"=== ROOT ROUTE CALLED ===")
+        print(f"Request method: {request.method}")
+        print(f"Request path: {request.path}")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Session data: {dict(session) if session else 'No session'}")
         
-    print("User in session, redirecting to mobile")
-    return redirect('/mobile')
+        if 'user' not in session:
+            print("No user in session, redirecting to login")
+            return redirect('/login')
+            
+        print("User in session, redirecting to mobile")
+        return redirect('/mobile')
+    except Exception as e:
+        print(f"ERROR in serve_index: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return f"Error: {str(e)}", 500
 
 @app.route('/index.html')
 def redirect_index_html():
@@ -412,6 +423,18 @@ def serve_contact_sub():
     """Serve the contact sub page"""
     return send_from_directory('static/components', 'contact-sub.html')
 
+@app.route('/favicon.ico')
+def serve_favicon():
+    """Serve favicon without authentication"""
+    try:
+        print("=== SERVING FAVICON ===")
+        return send_from_directory('static/images', 'rally_favicon.png', mimetype='image/x-icon')
+    except Exception as e:
+        print(f"Error serving favicon: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return '', 404
+
 @app.route('/<path:path>')
 @login_required
 def serve_static(path):
@@ -420,14 +443,6 @@ def serve_static(path):
     print(f"Path: {path}")
     print(f"Is public: {is_public_file(path)}")
     print(f"User in session: {'user' in session}")
-    
-    # Special handling for favicon.ico
-    if path == 'favicon.ico':
-        try:
-            return send_from_directory('static/images', 'rally_favicon.png', mimetype='image/x-icon')
-        except Exception as e:
-            print(f"Error serving favicon: {str(e)}")
-            return '', 404
     
     # Allow access to public files without authentication
     if is_public_file(path):
