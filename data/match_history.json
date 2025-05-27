@@ -1,0 +1,50 @@
+[
+  {
+    "Date": "2024-01-15",
+    "Home Team": "Birchwood S2B",
+    "Away Team": "Lake Forest S2B",
+    "Home Player 1": "John Smith",
+    "Home Player 2": "Jane Doe",
+    "Away Player 1": "Bob Wilson",
+    "Away Player 2": "Alice Brown",
+    "Winner": "home",
+    "Home Score": "6-4, 6-2",
+    "Away Score": "4-6, 2-6"
+  },
+  {
+    "Date": "2024-01-15",
+    "Home Team": "Birchwood S2B",
+    "Away Team": "Lake Forest S2B",
+    "Home Player 1": "Mike Johnson",
+    "Home Player 2": "Sarah Davis",
+    "Away Player 1": "Tom Anderson",
+    "Away Player 2": "Lisa Garcia",
+    "Winner": "away",
+    "Home Score": "3-6, 4-6",
+    "Away Score": "6-3, 6-4"
+  },
+  {
+    "Date": "2024-01-22",
+    "Home Team": "Ravinia Green S2B",
+    "Away Team": "Birchwood S2B",
+    "Home Player 1": "Chris Lee",
+    "Home Player 2": "Emma White",
+    "Away Player 1": "John Smith",
+    "Away Player 2": "Mike Johnson",
+    "Winner": "away",
+    "Home Score": "2-6, 3-6",
+    "Away Score": "6-2, 6-3"
+  },
+  {
+    "Date": "2024-01-22",
+    "Home Team": "Ravinia Green S2B",
+    "Away Team": "Birchwood S2B",
+    "Home Player 1": "David Kim",
+    "Home Player 2": "Rachel Taylor",
+    "Away Player 1": "Jane Doe",
+    "Away Player 2": "Sarah Davis",
+    "Winner": "home",
+    "Home Score": "6-4, 7-5",
+    "Away Score": "4-6, 5-7"
+  }
+]

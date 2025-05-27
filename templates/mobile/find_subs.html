@@ -1,0 +1,112 @@
+{% extends "mobile/layout.html" %}
+{% set show_back_arrow = True %}
+
+{% block content %}
+<div class="flex items-center gap-3 mt-4 mb-2 px-4">
+  <div class="bg-white rounded-md flex items-center justify-center h-12 w-12">
+    <i class="fas fa-user-plus text-black text-3xl"></i>
+  </div>
+  <div>
+    <div class="text-2xl font-bold leading-tight">Find Sub</div>
+    <div class="text-base text-gray-500 mt-1">Find available players from higher series at {{ session_data.user.club }} to substitute for your team.</div>
+  </div>
+</div>
+
+<div id="subsLoading" class="flex justify-center items-center py-8">
+    <span class="loading loading-spinner loading-lg"></span>
+</div>
+<div id="subsList" class="space-y-4"></div>
+
+<script>
+// Mobile Find Sub logic: match desktop behavior
+async function fetchAndRenderSubsMobile() {
+    const loadingDiv = document.getElementById('subsLoading');
+    const subsList = document.getElementById('subsList');
+    loadingDiv.style.display = 'flex';
+    subsList.innerHTML = '';
+    try {
+        // Use the same approach as desktop: fetch all substitute players
+        const response = await fetch('/api/players?all_subs=1');
+        if (!response.ok) throw new Error('Failed to fetch substitute players');
+        const players = await response.json();
+        
+        if (!players || players.length === 0) {
+            loadingDiv.style.display = 'none';
+            subsList.innerHTML = '<div class="text-center text-gray-500">No subs found in higher series at {{ session_data.user.club }}.</div>';
+            return;
+        }
+        
+        // Calculate composite score based on win rate and series (no PTI)
+        function calculateCompositeScore(winRate, series) {
+            const winRateDecimal = parseFloat((winRate + '').replace('%', '')) / 100;
+            
+            // Parse series number with letter support
+            const match = series.match(/(\d+)([A-Z]?)/);
+            let seriesNum = 1;
+            if (match) {
+                seriesNum = parseInt(match[1]);
+                const seriesLetter = match[2] || '';
+                
+                if (seriesLetter) {
+                    const letterValue = seriesLetter.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+                    seriesNum = seriesNum + (letterValue / 10);
+                }
+            }
+            
+            const normalizedSeries = (40 - seriesNum) / 40;
+            // Weight: 80% win rate, 20% series level (higher series = better)
+            return (winRateDecimal * 0.8) + (normalizedSeries * 0.2);
+        }
+        
+        const playersWithScores = players.map(player => ({
+            ...player,
+            compositeScore: calculateCompositeScore(player.winRate, player.series)
+        }));
+        
+        // Sort by composite score (highest to lowest)
+        playersWithScores.sort((a, b) => b.compositeScore - a.compositeScore);
+        
+        // Render cards, with a label for top 3
+        loadingDiv.style.display = 'none';
+        subsList.innerHTML = '';
+        if (playersWithScores.length > 0) {
+            // Label for top 3
+            const label = document.createElement('div');
+            label.className = 'text-center font-bold rounded px-2 py-2 mb-2';
+            label.style.background = '#ffde5a';
+            label.style.color = '#000000';
+            label.innerHTML = `Recommended subs at {{ session_data.user.club }} based upon Rally's algorithm`;
+            subsList.appendChild(label);
+        }
+        playersWithScores.forEach((player, idx) => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow p-4 flex flex-col gap-2' + (idx < 3 ? ' border-2 border-gray-700' : '');
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-lg">${player.name}</div>
+                        <div class="text-sm text-gray-500">${player.series}</div>
+                    </div>
+                    <button class="btn btn-success btn-sm" onclick="window.location.href='/contact-sub?first=${encodeURIComponent(player.name.split(' ')[0])}&last=${encodeURIComponent(player.name.split(' ').slice(1).join(' '))}'">
+                        <i class="fas fa-envelope"></i> Contact
+                    </button>
+                </div>
+                <div class="flex gap-4 text-sm mt-2">
+                    <div><span class="font-semibold">Wins:</span> ${player.wins}</div>
+                    <div><span class="font-semibold">Losses:</span> ${player.losses}</div>
+                    <div><span class="font-semibold">Win Rate:</span> ${player.winRate}%</div>
+                    <div><span class="font-semibold">Score:</span> <span class="composite-score">${(player.compositeScore * 100).toFixed(1)}</span></div>
+                </div>
+                ${player.preferredCourts ? `<div class="text-sm text-gray-600 mt-1"><span class="font-semibold">Preferred Courts:</span> ${player.preferredCourts}</div>` : ''}
+            `;
+            subsList.appendChild(card);
+        });
+    } catch (err) {
+        loadingDiv.style.display = 'none';
+        subsList.innerHTML = `<div class="text-center text-red-500">Error loading subs: ${err.message}</div>`;
+    }
+}
+// Run on page load
+fetchAndRenderSubsMobile();
+</script>
+{% endblock %} 
