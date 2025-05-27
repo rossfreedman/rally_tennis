@@ -10,9 +10,9 @@ echo "📁 Current directory: $(pwd)"
 echo "📋 Directory contents:"
 ls -la
 
-# Set port with priority: APP_PORT > PORT > default 8000
-export PORT=${APP_PORT:-${PORT:-8000}}
-echo "📡 Using port: $PORT"
+# Force port to 8080 for Railway compatibility
+export PORT=8080
+echo "📡 Using port: $PORT (forced for Railway compatibility)"
 echo "🔍 All PORT-related environment variables:"
 env | grep -i port || echo "No PORT variables found"
 
