@@ -13,6 +13,8 @@ ls -la
 # Set port with priority: APP_PORT > PORT > default 8000
 export PORT=${APP_PORT:-${PORT:-8000}}
 echo "📡 Using port: $PORT"
+echo "🔍 All PORT-related environment variables:"
+env | grep -i port || echo "No PORT variables found"
 
 # Ensure database connection variables are set
 if [ -z "$DATABASE_URL" ]; then
@@ -36,8 +38,25 @@ echo "SKIP_DB_HEALTH_CHECK=$SKIP_DB_HEALTH_CHECK"
 echo "🧪 Testing Python import..."
 python -c "import server; print('✅ Server import successful')" || echo "❌ Server import failed"
 
+# Test if we can bind to the port
+echo "🔌 Testing port availability..."
+python -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(('0.0.0.0', $PORT))
+    print('✅ Port $PORT is available')
+    s.close()
+except Exception as e:
+    print(f'❌ Port $PORT binding failed: {e}')
+    s.close()
+"
+
 # Start Gunicorn with Railway-optimized settings
-echo "🔧 Starting Gunicorn..."
+echo "🔧 Starting Gunicorn on 0.0.0.0:$PORT..."
+echo "📋 Full Gunicorn command:"
+echo "gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 120 --keep-alive 65 --max-requests 1000 --max-requests-jitter 50 --preload --log-level info --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance --forwarded-allow-ips='*'"
+
 exec gunicorn server:app \
     --bind "0.0.0.0:$PORT" \
     --workers 1 \

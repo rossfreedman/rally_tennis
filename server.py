@@ -65,52 +65,44 @@ def is_public_file(path):
 
 # Test database connection
 print("\n=== Testing Database Connection ===")
-
-# Skip database initialization during Railway startup if requested
-skip_db_init = os.getenv('SKIP_DB_INIT', 'false').lower() == 'true'
-
-if skip_db_init:
-    print("Database initialization skipped (SKIP_DB_INIT=true)")
-else:
-    try:
-        result = execute_query_one('SELECT 1 as test')
-        if result and result['test'] == 1:
-            print("Database connection successful!")
+try:
+    result = execute_query_one('SELECT 1 as test')
+    if result and result['test'] == 1:
+        print("Database connection successful!")
+        
+        # Check if tables exist and initialize if needed
+        print("\n=== Checking Database Tables ===")
+        tables_result = execute_query("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)
+        existing_tables = [row['table_name'] for row in tables_result]
+        
+        if 'clubs' not in existing_tables or 'series' not in existing_tables:
+            print("Tables missing, initializing database...")
+            from init_db import init_db
+            init_db()
+        else:
+            print("Database tables exist")
             
-            # Check if tables exist and initialize if needed
-            print("\n=== Checking Database Tables ===")
-            tables_result = execute_query("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-            """)
-            existing_tables = [row['table_name'] for row in tables_result]
+            # Check if clubs and series have data
+            clubs_count = execute_query_one("SELECT COUNT(*) as count FROM clubs")
+            series_count = execute_query_one("SELECT COUNT(*) as count FROM series")
             
-            if 'clubs' not in existing_tables or 'series' not in existing_tables:
-                print("Tables missing, initializing database...")
+            if clubs_count['count'] == 0 or series_count['count'] == 0:
+                print("Tables empty, initializing with default data...")
                 from init_db import init_db
                 init_db()
             else:
-                print("Database tables exist")
-                
-                # Check if clubs and series have data
-                clubs_count = execute_query_one("SELECT COUNT(*) as count FROM clubs")
-                series_count = execute_query_one("SELECT COUNT(*) as count FROM series")
-                
-                if clubs_count['count'] == 0 or series_count['count'] == 0:
-                    print("Tables empty, initializing with default data...")
-                    from init_db import init_db
-                    init_db()
-                else:
-                    print(f"Found {clubs_count['count']} clubs and {series_count['count']} series")
-        else:
-            print("Database connection test failed!")
-            print("WARNING: Continuing without database initialization...")
-    except Exception as e:
-        print(f"Error connecting to database: {str(e)}")
-        print(traceback.format_exc())
-        print("WARNING: Continuing without database initialization...")
-        print("The application will start but database features may not work until connection is established.")
+                print(f"Found {clubs_count['count']} clubs and {series_count['count']} series")
+    else:
+        print("Database connection test failed!")
+        sys.exit(1)
+except Exception as e:
+    print(f"Error connecting to database: {str(e)}")
+    print(traceback.format_exc())
+    sys.exit(1)
 
 # Configure logging
 logging.basicConfig(
