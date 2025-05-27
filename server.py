@@ -177,7 +177,8 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=1),
     SESSION_COOKIE_NAME='rally_session',
     SESSION_COOKIE_PATH='/',
-    SESSION_REFRESH_EACH_REQUEST=True
+    SESSION_REFRESH_EACH_REQUEST=True,
+    SESSION_COOKIE_DOMAIN=os.getenv('SESSION_COOKIE_DOMAIN')
 )
 
 # Configure CORS
@@ -187,8 +188,8 @@ CORS(app,
              "origins": ["*"] if is_development else [
                  "https://*.up.railway.app",
                  "https://*.railway.app",
-                 "https://lovetorally.com",
-                 "https://www.lovetorally.com"
+                 "https://rallytennaqua.com",
+                 "https://www.rallytennaqua.com"
              ],
              "supports_credentials": True,
              "allow_headers": ["Content-Type", "X-Requested-With", "Authorization"],
