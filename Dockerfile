@@ -41,7 +41,7 @@ RUN mkdir -p data logs \
 USER nobody
 
 # Expose the default port
-EXPOSE 8000
+EXPOSE 8080
 
 # Command to run the application using Railway startup script
 CMD ["./railway_start.sh"] 
