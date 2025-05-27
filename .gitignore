@@ -70,6 +70,7 @@ rally_tennis.db
 .env
 .env.local
 .env.production
+.env.backup
 
 # Node modules (if any)
 node_modules/
