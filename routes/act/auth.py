@@ -87,11 +87,12 @@ def init_routes(app):
                 # Insert new user
                 success = execute_update(
                     """
-                    INSERT INTO users (email, password_hash, first_name, last_name, club_id, series_id, is_admin)
-                    VALUES (%(email)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
+                    INSERT INTO users (email, password, password_hash, first_name, last_name, club_id, series_id, is_admin)
+                    VALUES (%(email)s, %(password)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
                     """,
                     {
                         'email': email,
+                        'password': hashed_password,  # For legacy compatibility
                         'password_hash': hashed_password,
                         'first_name': first_name,
                         'last_name': last_name,
