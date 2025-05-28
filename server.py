@@ -2371,7 +2371,13 @@ def parse_date(value):
 
 @app.template_filter('pretty_date')
 def pretty_date(value):
+    """Format dates for display with verification to handle Railway timezone issues"""
     try:
+        # Import our verification utilities
+        from utils.date_verification import verify_date_from_database, format_date_for_display
+        
+        print(f"[PRETTY_DATE] Input value: {value}, type: {type(value)}")
+        
         if isinstance(value, str):
             # Try different date formats
             formats = ['%Y-%m-%d', '%m/%d/%Y', '%d-%b-%y']
@@ -2383,17 +2389,36 @@ def pretty_date(value):
                 except ValueError:
                     continue
             if not date_obj:
+                print(f"[PRETTY_DATE] Could not parse date string: {value}")
                 return value
         else:
             date_obj = value
-            
-        # Format with day of week followed by date
-        day_of_week = date_obj.strftime('%A')
-        date_str = date_obj.strftime('%-m/%-d/%y')
-        return f"{day_of_week} {date_str}"
+        
+        # Use our verification system to ensure correct display
+        display_date, verification_info = verify_date_from_database(
+            stored_date=date_obj,
+            expected_display_format=None
+        )
+        
+        if verification_info.get('correction_applied'):
+            print(f"[PRETTY_DATE] Date correction applied: {verification_info.get('warning')}")
+        
+        print(f"[PRETTY_DATE] Final display: {display_date}")
+        return display_date
+        
     except Exception as e:
-        print(f"Error formatting date: {e}")
-        return value
+        print(f"[PRETTY_DATE] Error formatting date: {e}")
+        # Fallback to simple formatting
+        try:
+            if isinstance(value, str):
+                date_obj = datetime.strptime(value, '%Y-%m-%d')
+            else:
+                date_obj = value
+            day_of_week = date_obj.strftime('%A')
+            date_str = date_obj.strftime('%-m/%-d/%y')
+            return f"{day_of_week} {date_str}"
+        except:
+            return str(value)
 
 def get_player_analysis(user):
     """

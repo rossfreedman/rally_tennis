@@ -179,11 +179,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Helper to format YYYY-MM-DD as [Day of week], MM/DD/YY
     function formatDateString(dateStr) {
-        const [year, month, day] = dateStr.split('-');
-        const jsDate = new Date(Number(year), Number(month) - 1, Number(day));
-        const weekday = jsDate.toLocaleDateString(undefined, { weekday: 'long' });
-        const mmddyy = `${month}/${day}/${year.slice(-2)}`;
-        return `${weekday}, ${mmddyy}`;
+        // Use safe date parsing to avoid timezone issues
+        try {
+            if (!dateStr) return '';
+            
+            // Split the date string safely
+            const [year, month, day] = dateStr.split('-').map(Number);
+            
+            // Validate the parts
+            if (!year || !month || !day) {
+                console.warn('Invalid date parts:', {year, month, day});
+                return dateStr;
+            }
+            
+            // Create date object with explicit components (month is 0-indexed)
+            const jsDate = new Date(year, month - 1, day);
+            
+            // Verify the date was created correctly
+            if (isNaN(jsDate.getTime())) {
+                console.warn('Invalid date created:', jsDate);
+                return dateStr;
+            }
+            
+            // Ensure we got the expected date (handles invalid dates like Feb 30)
+            if (jsDate.getFullYear() !== year || 
+                jsDate.getMonth() !== (month - 1) || 
+                jsDate.getDate() !== day) {
+                console.warn('Date validation failed:', {
+                    expected: {year, month: month-1, day},
+                    actual: {year: jsDate.getFullYear(), month: jsDate.getMonth(), day: jsDate.getDate()}
+                });
+                return dateStr;
+            }
+            
+            const weekday = jsDate.toLocaleDateString('en-US', { weekday: 'long' });
+            const displayMonth = jsDate.getMonth() + 1; // Convert back to 1-indexed
+            const displayDay = jsDate.getDate();
+            const displayYear = jsDate.getFullYear().toString().slice(-2);
+            
+            const result = `${weekday}, ${displayMonth}/${displayDay}/${displayYear}`;
+            console.log(`Date formatting: ${dateStr} -> ${result}`);
+            return result;
+            
+        } catch (error) {
+            console.error('Error in formatDateString:', error);
+            return dateStr;
+        }
     }
 
     // Helper to format event type and opponent info
