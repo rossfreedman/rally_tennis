@@ -55,14 +55,14 @@ def get_player_availability(player_name, match_date, series):
             FROM player_availability 
             WHERE player_name = %(player_name)s 
             AND (
-                match_date = %(match_date)s 
+                match_date = %(match_date)s::date 
                 OR match_date = %(match_date_str)s::date
             )
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name.strip(),
-                'match_date': match_date,
+                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
                 'match_date_str': match_date.strftime('%Y-%m-%d'),
                 'series_id': series_record['id']
             }
@@ -121,12 +121,12 @@ def update_player_availability(player_name, match_date, status, series):
             SELECT id, availability_status 
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND match_date = %(match_date)s 
+            AND match_date = %(match_date)s::date 
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name,
-                'match_date': match_date,
+                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
                 'series_id': series_record['id']
             }
         )
@@ -138,7 +138,7 @@ def update_player_availability(player_name, match_date, status, series):
             INSERT INTO player_availability 
                 (player_name, match_date, availability_status, series_id, updated_at)
             VALUES 
-                (%(player_name)s, %(match_date)s, %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
+                (%(player_name)s, %(match_date)s::date, %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
             ON CONFLICT (player_name, match_date, series_id) 
             DO UPDATE SET 
                 availability_status = %(status)s,
@@ -147,7 +147,7 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': match_date,
+                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
                 'status': status,
                 'series_id': series_record['id']
             }
