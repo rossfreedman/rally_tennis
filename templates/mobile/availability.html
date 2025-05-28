@@ -142,11 +142,18 @@ async function updateAvailability(button, playerName, date, status) {
         }[status];
         
         let standardizedDate = date;
+        console.log(`DEBUG: Starting conversion with date='${date}'`);
+        
         if (date.includes('/')) {
             const [month, day, year] = date.split('/');
+            console.log(`DEBUG: Split parts - month='${month}', day='${day}', year='${year}'`);
+            
             // Convert 2-digit year to 4-digit year
             const fullYear = year.length === 2 ? `20${year}` : year;
+            console.log(`DEBUG: Year conversion - original='${year}', fullYear='${fullYear}'`);
+            
             standardizedDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            console.log(`DEBUG: Final standardizedDate='${standardizedDate}'`);
         }
         
         const requestData = {
