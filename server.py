@@ -5810,6 +5810,42 @@ def debug_club_addresses():
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()})
 
+@app.route('/debug/timezone')
+@login_required
+def debug_timezone():
+    """Debug endpoint to check database timezone"""
+    try:
+        from database_utils import execute_query_one
+        
+        # Check timezone
+        timezone_result = execute_query_one("SELECT current_setting('timezone') as timezone")
+        
+        # Check current time
+        now_result = execute_query_one("SELECT NOW() as now, CURRENT_DATE as current_date, CURRENT_TIME as current_time")
+        
+        # Test date storage
+        test_date = "2025-05-26"
+        test_result = execute_query_one(
+            "SELECT DATE(%(test_date)s) as parsed_date, %(test_date)s::date as cast_date",
+            {'test_date': test_date}
+        )
+        
+        return jsonify({
+            'timezone': timezone_result,
+            'current_time': {
+                'now': str(now_result['now']),
+                'current_date': str(now_result['current_date']),
+                'current_time': str(now_result['current_time'])
+            },
+            'date_test': {
+                'input': test_date,
+                'parsed_date': str(test_result['parsed_date']),
+                'cast_date': str(test_result['cast_date'])
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Get port from environment variable or use default
         port = int(os.environ.get("PORT", os.environ.get("RAILWAY_PORT", 8080)))
