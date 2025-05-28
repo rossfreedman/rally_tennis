@@ -118,6 +118,8 @@ def update_player_availability(player_name, match_date, status, series):
         # Convert to string for database to avoid timezone issues
         date_string = match_date.strftime('%Y-%m-%d')
         
+        print(f"DEBUG UPDATE: About to store date_string='{date_string}' in database")
+        
         # Check if record exists first
         existing = execute_query_one(
             """
@@ -299,6 +301,10 @@ def init_availability_routes(app):
                 print(f"Final parsed data: {data}")
                 print(f"Data type: {type(data)}")
                 print(f"Keys in data: {list(data.keys())}")
+                
+                # DEBUG: Log the exact date being received
+                received_date = data.get('match_date')
+                print(f"DEBUG BACKEND: Received match_date='{received_date}', type={type(received_date)}")
                 
                 # Validate required fields
                 required_fields = ['player_name', 'match_date', 'availability_status', 'series']
