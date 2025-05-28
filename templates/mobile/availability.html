@@ -65,11 +65,14 @@
                             </div>
                             <div class="flex items-center gap-1 mt-2">
                                 <i class="fas fa-map-marker-alt text-yellow-500 text-lg"></i>
-                                <span class="text-gray-600 text-lg">{{ match.location or match.home_team or session_data.user.club }}</span>
+                                {% set location_text = match.location or match.home_team or session_data.user.club %}
+                                {% if location_text != 'All Clubs' %}
+                                    <span class="text-gray-600 text-lg">{{ location_text }}</span>
+                                {% endif %}
                             </div>
                             <div class="mt-2">
-                                <a href="{{ url_for('serve_all_team_availability', date=match.date) }}" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
-                                    <i class="fas fa-users text-[8px]"></i>
+                                <a href="{{ url_for('serve_all_team_availability', date=match.date) }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500 text-white rounded-full text-xs font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                                    <i class="fas fa-users text-[6px]"></i>
                                     View full team availability
                                 </a>
                             </div>
@@ -87,8 +90,6 @@
                             style="text-transform: none;">
                             <i class="fas fa-check mr-1"></i>Count Me In!
                         </button>
-                        <!-- DEBUG: Raw date value -->
-                        <div style="font-size: 10px; color: red;">DEBUG: Raw date = '{{ match.date }}'</div>
                         <button 
                             class="btn availability-btn w-full py-2 text-center rounded-lg transition-colors text-base font-extrabold {% if avail.status == 'unavailable' %}bg-red-500 text-white{% else %}bg-gray-100 text-gray-700{% endif %} hover:bg-red-600 hover:text-white"
                             onclick="updateAvailability(this, '{{ players[0].name }}', '{{ match.date }}', 'unavailable')"
