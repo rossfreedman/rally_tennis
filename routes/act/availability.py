@@ -115,6 +115,9 @@ def update_player_availability(player_name, match_date, status, series):
                 print(f"Invalid date format: {match_date}, error: {str(e)}")
                 return False
         
+        # Convert to string for database to avoid timezone issues
+        date_string = match_date.strftime('%Y-%m-%d')
+        
         # Check if record exists first
         existing = execute_query_one(
             """
@@ -126,7 +129,7 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
+                'match_date': date_string,  # Use the debug date_string variable
                 'series_id': series_record['id']
             }
         )
@@ -147,7 +150,7 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
+                'match_date': date_string,  # Use the debug date_string variable
                 'status': status,
                 'series_id': series_record['id']
             }
