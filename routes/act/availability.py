@@ -31,12 +31,13 @@ def get_player_availability(player_name, match_date, series):
         original_date = match_date
         if isinstance(match_date, str):
             try:
-                # Convert MM/DD/YYYY to YYYY-MM-DD
+                # Handle multiple date formats
                 if '/' in match_date:
-                    month, day, year = match_date.split('/')
-                    match_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-                # Try to parse the date to validate format
-                match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
+                    # Handle MM/DD/YYYY format
+                    match_date = datetime.strptime(match_date, '%m/%d/%Y').date()
+                else:
+                    # Handle YYYY-MM-DD format
+                    match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
                 print(f"Standardized date: {match_date} (from {original_date})")
             except ValueError as e:
                 print(f"Invalid date format: {match_date}, error: {str(e)}")
@@ -103,9 +104,15 @@ def update_player_availability(player_name, match_date, status, series):
         # Standardize the date format
         if isinstance(match_date, str):
             try:
-                match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
-            except ValueError:
-                print(f"Invalid date format: {match_date}")
+                # Handle multiple date formats
+                if '/' in match_date:
+                    # Handle MM/DD/YYYY format
+                    match_date = datetime.strptime(match_date, '%m/%d/%Y').date()
+                else:
+                    # Handle YYYY-MM-DD format
+                    match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
+            except ValueError as e:
+                print(f"Invalid date format: {match_date}, error: {str(e)}")
                 return False
         
         # Check if record exists first
