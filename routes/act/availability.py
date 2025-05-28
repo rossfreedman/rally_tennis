@@ -54,16 +54,12 @@ def get_player_availability(player_name, match_date, series):
             SELECT availability_status 
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND (
-                match_date = DATE(%(match_date)s) 
-                OR match_date = DATE(%(match_date_str)s)
-            )
+            AND match_date = (%(match_date)s || ' 12:00:00')::timestamp::date
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name.strip(),
                 'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
-                'match_date_str': match_date.strftime('%Y-%m-%d'),
                 'series_id': series_record['id']
             }
         )
@@ -126,24 +122,25 @@ def update_player_availability(player_name, match_date, status, series):
             SELECT id, availability_status 
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND match_date = DATE(%(match_date)s) 
+            AND match_date = (%(match_date)s || ' 12:00:00')::timestamp::date
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name,
-                'match_date': date_string,  # Use the debug date_string variable
+                'match_date': date_string,
                 'series_id': series_record['id']
             }
         )
         print(f"Existing record: {existing}")
         
-        # Perform the update/insert
+        # Perform the update/insert with explicit timezone handling
+        # Add noon time to ensure date doesn't shift when converted between timezones
         result = execute_query_one(
             """
             INSERT INTO player_availability 
                 (player_name, match_date, availability_status, series_id, updated_at)
             VALUES 
-                (%(player_name)s, DATE(%(match_date)s), %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
+                (%(player_name)s, (%(match_date)s || ' 12:00:00')::timestamp::date, %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
             ON CONFLICT (player_name, match_date, series_id) 
             DO UPDATE SET 
                 availability_status = %(status)s,
@@ -152,7 +149,7 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': date_string,  # Use the debug date_string variable
+                'match_date': date_string,
                 'status': status,
                 'series_id': series_record['id']
             }
