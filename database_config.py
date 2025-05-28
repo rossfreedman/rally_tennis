@@ -69,6 +69,8 @@ def parse_db_url(url):
         'keepalives_count': 3,
         'tcp_user_timeout': 30000,  # 30 seconds in milliseconds
         'target_session_attrs': 'read-write',
+        # Add timezone configuration to prevent date conversion issues
+        'options': '-c timezone=America/Chicago'
     }
 
 def test_db_connection():
@@ -84,10 +86,11 @@ def test_db_connection():
         logger.info(f"Testing database connection to {test_params['host']}:{test_params['port']}")
         conn = psycopg2.connect(**test_params)
         
-        # Test with a simple query
+        # Test with a simple query and verify timezone
         with conn.cursor() as cursor:
-            cursor.execute('SELECT 1 as test')
+            cursor.execute('SELECT 1 as test, current_setting(\'timezone\') as tz')
             result = cursor.fetchone()
+            logger.info(f"Database timezone: {result[1]}")
             
         conn.close()
         logger.info("Database connection test successful!")
@@ -100,7 +103,7 @@ def test_db_connection():
 
 @contextmanager
 def get_db():
-    """Get database connection with retry logic"""
+    """Get database connection with retry logic and timezone configuration"""
     url = get_db_url()
     db_params = parse_db_url(url)
     
@@ -111,6 +114,7 @@ def get_db():
     logger.info(f"Database: {db_params['dbname']}")
     logger.info(f"SSL Mode: {db_params['sslmode']}")
     logger.info(f"Connect Timeout: {db_params['connect_timeout']}s")
+    logger.info(f"Timezone Options: {db_params.get('options', 'None')}")
     
     max_retries = 5
     retry_delay = 5
@@ -122,6 +126,15 @@ def get_db():
                 time.sleep(retry_delay)
             
             conn = psycopg2.connect(**db_params)
+            
+            # Ensure timezone is set correctly for this session
+            with conn.cursor() as cursor:
+                cursor.execute("SET timezone = 'America/Chicago'")
+                cursor.execute("SELECT current_setting('timezone')")
+                tz = cursor.fetchone()[0]
+                logger.info(f"Database session timezone set to: {tz}")
+            
+            conn.commit()
             logger.info("Database connection successful!")
             yield conn
             return

@@ -1,5 +1,5 @@
 from flask import jsonify, request, session, render_template
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import json
 import traceback
@@ -7,6 +7,48 @@ from database_utils import execute_query, execute_query_one
 from utils.logging import log_user_activity
 from routes.act.schedule import get_matches_for_user_club
 from utils.auth import login_required
+import pytz
+
+# Define the application timezone
+APP_TIMEZONE = pytz.timezone('America/Chicago')
+
+def normalize_date_for_db(date_input, target_timezone='America/Chicago'):
+    """
+    Normalize date input to a consistent TIMESTAMPTZ format for database storage.
+    Always stores dates at noon in the target timezone to avoid edge cases.
+    """
+    try:
+        print(f"Normalizing date: {date_input} (type: {type(date_input)})")
+        
+        if isinstance(date_input, str):
+            # Handle multiple date formats
+            if '/' in date_input:
+                # Handle MM/DD/YYYY format
+                dt = datetime.strptime(date_input, '%m/%d/%Y')
+            else:
+                # Handle YYYY-MM-DD format
+                dt = datetime.strptime(date_input, '%Y-%m-%d')
+        elif isinstance(date_input, datetime):
+            dt = date_input
+        else:
+            raise ValueError(f"Unsupported date type: {type(date_input)}")
+        
+        # Set time to noon to avoid timezone edge cases
+        dt = dt.replace(hour=12, minute=0, second=0, microsecond=0)
+        
+        # Localize to target timezone
+        tz = pytz.timezone(target_timezone)
+        if dt.tzinfo is None:
+            dt = tz.localize(dt)
+        else:
+            dt = dt.astimezone(tz)
+        
+        print(f"Normalized to: {dt}")
+        return dt
+        
+    except Exception as e:
+        print(f"Error normalizing date {date_input}: {str(e)}")
+        raise
 
 def get_player_availability(player_name, match_date, series):
     """Get availability for a player on a specific date"""
@@ -27,42 +69,27 @@ def get_player_availability(player_name, match_date, series):
             print(f"No series found with name: {series}")
             return None
         
-        # Standardize the date format
-        original_date = match_date
-        if isinstance(match_date, str):
-            try:
-                # Handle multiple date formats
-                if '/' in match_date:
-                    # Handle MM/DD/YYYY format
-                    match_date = datetime.strptime(match_date, '%m/%d/%Y').date()
-                else:
-                    # Handle YYYY-MM-DD format
-                    match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
-                print(f"Standardized date: {match_date} (from {original_date})")
-            except ValueError as e:
-                print(f"Invalid date format: {match_date}, error: {str(e)}")
-                return None
+        # Normalize the date
+        normalized_date = normalize_date_for_db(match_date)
         
         print(f"Querying availability with parameters:")
         print(f"  player_name: {player_name.strip()}")
-        print(f"  match_date: {match_date}")
+        print(f"  match_date: {normalized_date}")
         print(f"  series_id: {series_record['id']}")
         
-        # Set session timezone to ensure consistent date interpretation
-        execute_query_one("SET timezone = 'America/Chicago'")
-        
-        # Try both date formats in the query
+        # Query using date comparison that handles timezone properly
+        # We compare dates by extracting the date part in the application timezone
         result = execute_query_one(
             """
             SELECT availability_status 
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND match_date = DATE(%(match_date)s)
+            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(match_date)s AT TIME ZONE 'America/Chicago')
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name.strip(),
-                'match_date': match_date.strftime('%Y-%m-%d'),  # Convert to string to avoid timezone issues
+                'match_date': normalized_date,
                 'series_id': series_record['id']
             }
         )
@@ -77,8 +104,8 @@ def get_player_availability(player_name, match_date, series):
             
     except Exception as e:
         print(f"Error getting player availability: {str(e)}")
-        print(traceback.format_exc())  # Add full traceback
-        return None  # Return None on error instead of defaulting to "not_sure"
+        print(traceback.format_exc())
+        return None
 
 def update_player_availability(player_name, match_date, status, series):
     """Update or insert availability for a player"""
@@ -100,27 +127,10 @@ def update_player_availability(player_name, match_date, status, series):
             print(f"No series found with name: {series}")
             return False
         
-        # Standardize the date format
-        if isinstance(match_date, str):
-            try:
-                # Handle multiple date formats
-                if '/' in match_date:
-                    # Handle MM/DD/YYYY format
-                    match_date = datetime.strptime(match_date, '%m/%d/%Y').date()
-                else:
-                    # Handle YYYY-MM-DD format
-                    match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
-            except ValueError as e:
-                print(f"Invalid date format: {match_date}, error: {str(e)}")
-                return False
+        # Normalize the date
+        normalized_date = normalize_date_for_db(match_date)
         
-        # Convert to string for database to avoid timezone issues
-        date_string = match_date.strftime('%Y-%m-%d')
-        
-        print(f"DEBUG UPDATE: About to store date_string='{date_string}' in database")
-        
-        # Set session timezone to ensure consistent date interpretation
-        execute_query_one("SET timezone = 'America/Chicago'")
+        print(f"DEBUG UPDATE: About to store normalized_date='{normalized_date}' in database")
         
         # Check if record exists first
         existing = execute_query_one(
@@ -128,34 +138,33 @@ def update_player_availability(player_name, match_date, status, series):
             SELECT id, availability_status 
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND match_date = DATE(%(match_date)s)
+            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(match_date)s AT TIME ZONE 'America/Chicago')
             AND series_id = %(series_id)s
             """,
             {
                 'player_name': player_name,
-                'match_date': date_string,
+                'match_date': normalized_date,
                 'series_id': series_record['id']
             }
         )
         print(f"Existing record: {existing}")
         
-        # Perform the update/insert with explicit timezone handling
-        # Add noon time to ensure date doesn't shift when converted between timezones
+        # Perform the update/insert with proper timezone handling
         result = execute_query_one(
             """
             INSERT INTO player_availability 
                 (player_name, match_date, availability_status, series_id, updated_at)
             VALUES 
-                (%(player_name)s, DATE(%(match_date)s), %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
+                (%(player_name)s, %(match_date)s, %(status)s, %(series_id)s, CURRENT_TIMESTAMP)
             ON CONFLICT (player_name, match_date, series_id) 
             DO UPDATE SET 
                 availability_status = %(status)s,
                 updated_at = CURRENT_TIMESTAMP
-            RETURNING id, availability_status
+            RETURNING id, availability_status, match_date
             """,
             {
                 'player_name': player_name,
-                'match_date': date_string,
+                'match_date': normalized_date,
                 'status': status,
                 'series_id': series_record['id']
             }
@@ -165,6 +174,7 @@ def update_player_availability(player_name, match_date, status, series):
         return bool(result)
     except Exception as e:
         print(f"Error updating player availability: {str(e)}")
+        print(traceback.format_exc())
         return False
 
 def get_user_availability(player_name, matches, series):

@@ -8,6 +8,7 @@ import logging
 from sqlalchemy.engine import URL
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +56,7 @@ class PlayerAvailability(Base):
     __tablename__ = 'player_availability'
     id = Column(Integer, primary_key=True)
     player_name = Column(String(255), nullable=False)
-    match_date = Column(Date, nullable=False)
+    match_date = Column(TIMESTAMP(timezone=True), nullable=False)
     availability_status = Column(Integer, nullable=False, server_default=text('3'))
     updated_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     series_id = Column(Integer, ForeignKey('series.id'), nullable=False)
@@ -80,40 +81,67 @@ class UserInstruction(Base):
     created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     is_active = Column(Boolean, nullable=False, server_default=text('true'))
 
-def sync_schema():
-    logger.info("Creating SQLAlchemy engine for Railway...")
-    logger.info(f"Using database host: {urlparse(RAILWAY_DB_URL).hostname}")
+def create_engine_with_timezone():
+    """Create SQLAlchemy engine with proper timezone configuration"""
+    url = get_railway_url()
     
-    # Create engine with timeout and SSL requirements
-    connect_args = {
-        "connect_timeout": 10,
-        "sslmode": "require",
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 5
-    }
-    
+    # Add timezone configuration to the connection
     engine = create_engine(
-        RAILWAY_DB_URL,
-        connect_args=connect_args,
+        url,
         pool_pre_ping=True,
-        pool_timeout=30
+        pool_recycle=300,
+        connect_args={
+            "options": "-c timezone=America/Chicago"
+        }
     )
+    
+    # Set timezone for all connections
+    @event.listens_for(engine, "connect")
+    def set_timezone(dbapi_connection, connection_record):
+        with dbapi_connection.cursor() as cursor:
+            cursor.execute("SET timezone = 'America/Chicago'")
+    
+    return engine
 
-    logger.info("Creating all tables that don't exist...")
-    Base.metadata.create_all(engine)
-
-    logger.info("Creating indexes...")
-    with engine.connect() as conn:
-        # Create indexes if they don't exist
-        conn.execute(text('CREATE INDEX IF NOT EXISTS idx_user_email ON users(email)'))
-        conn.execute(text('CREATE INDEX IF NOT EXISTS idx_player_availability ON player_availability(player_name, match_date, series_id)'))
-        conn.execute(text('CREATE INDEX IF NOT EXISTS idx_user_activity_logs_user_email ON user_activity_logs(user_email, timestamp)'))
-        conn.execute(text('CREATE INDEX IF NOT EXISTS idx_user_instructions_email ON user_instructions(user_email)'))
-        conn.commit()
-
-    logger.info("✅ Railway database schema synced with local models.")
+def sync_schema():
+    """Sync the schema with Railway database"""
+    try:
+        engine = create_engine_with_timezone()
+        
+        logger.info("Connecting to Railway database...")
+        
+        # Test connection
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT current_setting('timezone') as tz"))
+            tz = result.fetchone()[0]
+            logger.info(f"Connected successfully! Database timezone: {tz}")
+        
+        logger.info("Creating/updating tables...")
+        
+        # Create all tables
+        Base.metadata.create_all(engine)
+        
+        logger.info("Schema sync completed successfully!")
+        
+        # Verify the schema
+        with engine.connect() as conn:
+            # Check if player_availability table has the correct column type
+            result = conn.execute(text("""
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'player_availability'
+                AND column_name = 'match_date'
+            """))
+            
+            column_info = result.fetchone()
+            if column_info:
+                logger.info(f"player_availability.match_date column: {column_info[1]} (nullable: {column_info[2]})")
+            else:
+                logger.warning("Could not verify player_availability.match_date column")
+        
+    except Exception as e:
+        logger.error(f"Error syncing schema: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     sync_schema() 

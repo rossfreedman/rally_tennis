@@ -5401,32 +5401,28 @@ def get_player_availability(player_name, match_date, series):
             
         series_id = series_record[0]['id']
         
-        # Convert match_date to datetime if it's a string
-        if isinstance(match_date, str):
-            if '/' in match_date:  # Handle MM/DD/YYYY format
-                match_date = datetime.strptime(match_date, '%m/%d/%Y').date()
-            else:  # Handle YYYY-MM-DD format
-                match_date = datetime.strptime(match_date, '%Y-%m-%d').date()
-        elif isinstance(match_date, dict) and 'date' in match_date:
-            # Handle case where match_date is a dictionary containing date
-            date_str = match_date['date']
-            if '/' in date_str:
-                match_date = datetime.strptime(date_str, '%m/%d/%Y').date()
-            else:
-                match_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        # Import the normalize function from availability module
+        from routes.act.availability import normalize_date_for_db
+        
+        # Normalize the date for consistent comparison
+        try:
+            normalized_date = normalize_date_for_db(match_date)
+        except Exception as e:
+            print(f"❌ Error normalizing date {match_date}: {str(e)}")
+            return {'availability_status': 0}
 
-        # Query the database for availability
+        # Query the database for availability using timezone-aware date comparison
         query = """
             SELECT availability_status
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
-            AND match_date = %(date)s::date
+            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
         """
         params = {
             'player': player_name,
             'series_id': series_id,
-            'date': match_date
+            'date': normalized_date
         }
         
         result = execute_query(query, params)
