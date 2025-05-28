@@ -5201,12 +5201,11 @@ def submit_availability():
                 return 'Series not found', 404
 
         # Update availability using the existing function
-        success = update_player_availability(
-            series_record['id'],  # Pass series ID instead of name
-            match_date.strip(),
+        success = act_update_player_availability(
             player_name.strip(),
+            match_date.strip(),
             numeric_status,
-            series  # Keep series name for logging
+            series
         )
 
         if not success:
