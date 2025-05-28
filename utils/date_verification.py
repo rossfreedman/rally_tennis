@@ -131,22 +131,30 @@ def check_railway_date_correction(date_obj):
     tz_env = os.getenv('TZ')
     pgtz_env = os.getenv('PGTZ')
     
-    # If timezone environment variables are properly set, no correction needed
-    if tz_env == 'America/Chicago' or pgtz_env == 'America/Chicago':
-        logger.info(f"Timezone environment variables detected ({tz_env=}, {pgtz_env=}), skipping Railway correction")
+    # If ANY timezone environment variables are properly set, no correction needed
+    # This means Railway timezone issues are handled at the infrastructure level
+    if (tz_env and 'America/Chicago' in tz_env) or (pgtz_env and 'America/Chicago' in pgtz_env):
+        logger.info(f"Timezone environment variables detected (TZ={tz_env}, PGTZ={pgtz_env}), skipping Railway correction")
         return date_obj
     
-    # Only apply Railway correction if timezone env vars are not set
-    is_railway = os.getenv('RAILWAY_ENVIRONMENT') is not None or os.getenv('DATABASE_URL', '').find('railway') != -1
+    # Also check for any timezone-related environment variables that indicate proper setup
+    railway_env_vars = [
+        'RAILWAY_ENVIRONMENT', 'DATABASE_URL', 'POSTGRES_DB', 'PGDATABASE'
+    ]
     
-    if is_railway:
-        # On Railway without timezone env vars, dates are typically stored one day behind
-        # Add one day to compensate
-        corrected_date = date_obj + timedelta(days=1)
-        logger.info(f"Railway correction applied (no timezone env vars): {date_obj} -> {corrected_date}")
-        return corrected_date
+    is_railway = any(os.getenv(var) for var in railway_env_vars)
     
-    return date_obj
+    if not is_railway:
+        logger.info("Not running on Railway, no correction needed")
+        return date_obj
+    
+    # Only apply Railway correction if:
+    # 1. We're on Railway
+    # 2. No timezone environment variables are set
+    logger.info("Railway environment detected without timezone variables, applying +1 day correction")
+    corrected_date = date_obj + timedelta(days=1)
+    logger.info(f"Railway correction applied: {date_obj} -> {corrected_date}")
+    return corrected_date
 
 def normalize_date_string(date_str):
     """
