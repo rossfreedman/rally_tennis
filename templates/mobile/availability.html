@@ -112,6 +112,9 @@
 
 <script>
 async function updateAvailability(button, playerName, date, status) {
+    // DEBUG: Log the actual date received
+    console.log(`DEBUG: updateAvailability called with date='${date}', type=${typeof date}`);
+    
     const buttonGroup = button.closest('[data-availability-buttons]');
     const allButtons = buttonGroup.querySelectorAll('button');
     

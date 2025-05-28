@@ -223,6 +223,12 @@ def init_availability_routes(app):
             # Get matches for the user's club/series
             matches = get_matches_for_user_club(user)
             
+            # DEBUG: Log the actual date formats being passed to template
+            print(f"\n=== DEBUG: MATCHES PASSED TO TEMPLATE ===")
+            for i, match in enumerate(matches):
+                print(f"Match {i}: date='{match.get('date')}', type={type(match.get('date'))}")
+            print("=== END DEBUG ===\n")
+            
             # Get this user's availability for each match
             availability = get_user_availability(player_name, matches, series)
 
