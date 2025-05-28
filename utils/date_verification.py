@@ -125,17 +125,25 @@ def check_railway_date_correction(date_obj):
     Returns:
         date: Corrected date if needed, original date otherwise
     """
-    # For now, we'll detect the Railway environment and apply correction
-    # You can refine this logic based on your specific needs
-    
     import os
+    
+    # Check if timezone environment variables are set
+    tz_env = os.getenv('TZ')
+    pgtz_env = os.getenv('PGTZ')
+    
+    # If timezone environment variables are properly set, no correction needed
+    if tz_env == 'America/Chicago' or pgtz_env == 'America/Chicago':
+        logger.info(f"Timezone environment variables detected ({tz_env=}, {pgtz_env=}), skipping Railway correction")
+        return date_obj
+    
+    # Only apply Railway correction if timezone env vars are not set
     is_railway = os.getenv('RAILWAY_ENVIRONMENT') is not None or os.getenv('DATABASE_URL', '').find('railway') != -1
     
     if is_railway:
-        # On Railway, dates are typically stored one day behind
+        # On Railway without timezone env vars, dates are typically stored one day behind
         # Add one day to compensate
         corrected_date = date_obj + timedelta(days=1)
-        logger.info(f"Railway correction applied: {date_obj} -> {corrected_date}")
+        logger.info(f"Railway correction applied (no timezone env vars): {date_obj} -> {corrected_date}")
         return corrected_date
     
     return date_obj
