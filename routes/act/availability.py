@@ -1,5 +1,5 @@
 from flask import jsonify, request, session, render_template
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import json
 import traceback
@@ -108,7 +108,7 @@ def get_player_availability(player_name, match_date, series):
         return None
 
 def update_player_availability(player_name, match_date, status, series):
-    """Update or insert availability for a player"""
+    """Update or insert availability for a player with date correction workaround"""
     try:
         print(f"\n=== UPDATE PLAYER AVAILABILITY ===")
         print(f"Player: {player_name}")
@@ -128,9 +128,9 @@ def update_player_availability(player_name, match_date, status, series):
             return False
         
         # Normalize the date
-        normalized_date = normalize_date_for_db(match_date)
+        original_normalized_date = normalize_date_for_db(match_date)
         
-        print(f"DEBUG UPDATE: About to store normalized_date='{normalized_date}' in database")
+        print(f"DEBUG UPDATE: About to store normalized_date='{original_normalized_date}' in database")
         
         # Check if record exists first
         existing = execute_query_one(
@@ -143,7 +143,7 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': normalized_date,
+                'match_date': original_normalized_date,
                 'series_id': series_record['id']
             }
         )
@@ -164,14 +164,73 @@ def update_player_availability(player_name, match_date, status, series):
             """,
             {
                 'player_name': player_name,
-                'match_date': normalized_date,
+                'match_date': original_normalized_date,
                 'status': status,
                 'series_id': series_record['id']
             }
         )
-        print(f"Update result: {result}")
+        print(f"Initial insert/update result: {result}")
         
-        return bool(result)
+        if not result:
+            print("❌ Failed to insert/update record")
+            return False
+            
+        # DATE CORRECTION WORKAROUND: Check if the stored date is one day behind
+        stored_record_id = result['id']
+        stored_date = result['match_date']
+        
+        print(f"\n=== DATE VERIFICATION WORKAROUND ===")
+        print(f"Original date sent: {original_normalized_date}")
+        print(f"Date stored in DB: {stored_date}")
+        
+        # Convert both dates to date objects for comparison (ignoring time)
+        if hasattr(original_normalized_date, 'date'):
+            original_date_only = original_normalized_date.date()
+        else:
+            original_date_only = original_normalized_date
+            
+        if hasattr(stored_date, 'date'):
+            stored_date_only = stored_date.date()
+        else:
+            stored_date_only = stored_date
+            
+        print(f"Original date (date only): {original_date_only}")
+        print(f"Stored date (date only): {stored_date_only}")
+        
+        # Check if stored date is one day behind the original
+        if stored_date_only == (original_date_only - timedelta(days=1)):
+            print("🔧 DETECTED: Stored date is one day behind! Applying correction...")
+            
+            # Calculate the corrected date (add 1 day to the original)
+            corrected_date = original_normalized_date + timedelta(days=1)
+            print(f"Corrected date to store: {corrected_date}")
+            
+            # Update the record with the corrected date
+            correction_result = execute_query_one(
+                """
+                UPDATE player_availability 
+                SET match_date = %(corrected_date)s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %(record_id)s
+                RETURNING id, availability_status, match_date
+                """,
+                {
+                    'corrected_date': corrected_date,
+                    'record_id': stored_record_id
+                }
+            )
+            print(f"Date correction result: {correction_result}")
+            
+            if correction_result:
+                print("✅ Date correction applied successfully!")
+                return True
+            else:
+                print("❌ Date correction failed!")
+                return False
+        else:
+            print("✅ Date stored correctly, no correction needed")
+            return True
+        
     except Exception as e:
         print(f"Error updating player availability: {str(e)}")
         print(traceback.format_exc())
