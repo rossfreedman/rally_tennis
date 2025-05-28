@@ -138,7 +138,9 @@ async function updateAvailability(button, playerName, date, status) {
         let standardizedDate = date;
         if (date.includes('/')) {
             const [month, day, year] = date.split('/');
-            standardizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            // Convert 2-digit year to 4-digit year
+            const fullYear = year.length === 2 ? `20${year}` : year;
+            standardizedDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
         
         const requestData = {
