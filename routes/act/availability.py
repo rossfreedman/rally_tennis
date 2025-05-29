@@ -133,7 +133,19 @@ def get_player_availability(player_name, match_date, series):
 
 def update_player_availability(player_name, match_date, availability_status, series):
     """
-    Update player availability with enhanced date verification
+    Update player availability with enhanced date verification and correction
+    
+    This function now includes a comprehensive post-storage verification system that:
+    1. Stores the availability record with the intended date
+    2. Verifies that the record was stored with the correct date
+    3. If a discrepancy is found (most commonly one day earlier due to timezone issues):
+       - Searches for records with the wrong date but correct status and player info
+       - Updates the discrepant record to have the correct date
+       - Verifies the correction was successful
+    4. Logs all verification and correction operations for monitoring
+    
+    This addresses timezone-related date storage issues that can cause records
+    to be stored with dates that are off by one day.
     """
     try:
         print(f"\n=== UPDATE PLAYER AVAILABILITY WITH VERIFICATION ===")
@@ -171,14 +183,14 @@ def update_player_availability(player_name, match_date, availability_status, ser
         # Convert corrected date to date object for database
         try:
             if isinstance(corrected_date, str):
-                date_obj = datetime.strptime(corrected_date, '%Y-%m-%d').date()
+                intended_date_obj = datetime.strptime(corrected_date, '%Y-%m-%d').date()
             else:
-                date_obj = corrected_date
+                intended_date_obj = corrected_date
         except Exception as e:
             print(f"❌ Error converting corrected date: {e}")
             return False
         
-        print(f"Final date for storage: {date_obj}")
+        print(f"Intended date for storage: {intended_date_obj}")
         
         # Check if record exists
         existing_record = execute_query_one(
@@ -192,7 +204,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
             {
                 'player': player_name,
                 'series_id': series_id,
-                'date': date_obj
+                'date': intended_date_obj
             }
         )
         
@@ -212,24 +224,127 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 }
             )
         else:
-            print("Creating new availability record")
-            result = execute_query(
+            # Before creating a new record, check for discrepant dates (timezone issues)
+            print("No record found with intended date. Checking for date discrepancies...")
+            
+            # Check one day earlier (most likely scenario)
+            one_day_earlier = intended_date_obj - timedelta(days=1)
+            earlier_record = execute_query_one(
                 """
-                INSERT INTO player_availability (player_name, match_date, availability_status, series_id, updated_at)
-                VALUES (%(player)s, %(date)s, %(status)s, %(series_id)s, NOW())
+                SELECT id, match_date, availability_status 
+                FROM player_availability 
+                WHERE player_name = %(player)s 
+                AND series_id = %(series_id)s 
+                AND match_date = %(date)s
                 """,
                 {
                     'player': player_name,
-                    'date': date_obj,
-                    'status': availability_status,
-                    'series_id': series_id
+                    'series_id': series_id,
+                    'date': one_day_earlier
                 }
             )
+            
+            # Check one day later (less likely but possible)
+            one_day_later = intended_date_obj + timedelta(days=1)
+            later_record = execute_query_one(
+                """
+                SELECT id, match_date, availability_status 
+                FROM player_availability 
+                WHERE player_name = %(player)s 
+                AND series_id = %(series_id)s 
+                AND match_date = %(date)s
+                """,
+                {
+                    'player': player_name,
+                    'series_id': series_id,
+                    'date': one_day_later
+                }
+            )
+            
+            # If we find a discrepant record, correct it instead of creating a new one
+            if earlier_record:
+                print(f"🔧 Found record one day earlier: {one_day_earlier} (should be {intended_date_obj})")
+                print(f"   Correcting record ID {earlier_record['id']} date and status")
+                
+                # Update both the date and status of the discrepant record
+                result = execute_query(
+                    """
+                    UPDATE player_availability 
+                    SET match_date = %(correct_date)s, availability_status = %(status)s, updated_at = NOW()
+                    WHERE id = %(id)s
+                    """,
+                    {
+                        'correct_date': intended_date_obj,
+                        'status': availability_status,
+                        'id': earlier_record['id']
+                    }
+                )
+                
+                # Log the pre-storage correction
+                log_date_operation(
+                    operation="PRE_STORAGE_CORRECTION",
+                    input_data=f"discrepant_date={one_day_earlier}, intended_date={intended_date_obj}",
+                    output_data=f"corrected_existing_record_id={earlier_record['id']}",
+                    verification_info={
+                        'discrepancy_found': True,
+                        'discrepancy_type': "one_day_earlier",
+                        'correction_type': "update_existing_record"
+                    }
+                )
+                
+            elif later_record:
+                print(f"🔧 Found record one day later: {one_day_later} (should be {intended_date_obj})")
+                print(f"   Correcting record ID {later_record['id']} date and status")
+                
+                # Update both the date and status of the discrepant record
+                result = execute_query(
+                    """
+                    UPDATE player_availability 
+                    SET match_date = %(correct_date)s, availability_status = %(status)s, updated_at = NOW()
+                    WHERE id = %(id)s
+                    """,
+                    {
+                        'correct_date': intended_date_obj,
+                        'status': availability_status,
+                        'id': later_record['id']
+                    }
+                )
+                
+                # Log the pre-storage correction
+                log_date_operation(
+                    operation="PRE_STORAGE_CORRECTION",
+                    input_data=f"discrepant_date={one_day_later}, intended_date={intended_date_obj}",
+                    output_data=f"corrected_existing_record_id={later_record['id']}",
+                    verification_info={
+                        'discrepancy_found': True,
+                        'discrepancy_type': "one_day_later", 
+                        'correction_type': "update_existing_record"
+                    }
+                )
+                
+            else:
+                # No discrepant records found, create new record
+                print("Creating new availability record")
+                result = execute_query(
+                    """
+                    INSERT INTO player_availability (player_name, match_date, availability_status, series_id, updated_at)
+                    VALUES (%(player)s, %(date)s, %(status)s, %(series_id)s, NOW())
+                    """,
+                    {
+                        'player': player_name,
+                        'date': intended_date_obj,
+                        'status': availability_status,
+                        'series_id': series_id
+                    }
+                )
         
-        # Verify the storage was successful by reading it back
+        # Enhanced post-storage verification and correction
+        print(f"\n=== POST-STORAGE VERIFICATION AND CORRECTION ===")
+        
+        # First check if the record exists with the intended date
         verification_record = execute_query_one(
             """
-            SELECT match_date, availability_status 
+            SELECT id, match_date, availability_status 
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
@@ -238,28 +353,153 @@ def update_player_availability(player_name, match_date, availability_status, ser
             {
                 'player': player_name,
                 'series_id': series_id,
-                'date': date_obj
+                'date': intended_date_obj
             }
         )
         
         if verification_record:
+            # Perfect match - no discrepancy
             stored_date = verification_record['match_date']
             stored_status = verification_record['availability_status']
             
-            print(f"✅ Verification: Stored date={stored_date}, status={stored_status}")
+            print(f"✅ Perfect match: Stored date={stored_date}, status={stored_status}")
             
             # Log the successful storage
             log_date_operation(
                 operation="POST_STORAGE_VERIFICATION",
-                input_data=f"date={date_obj}, status={availability_status}",
+                input_data=f"intended_date={intended_date_obj}, status={availability_status}",
                 output_data=f"stored_date={stored_date}, stored_status={stored_status}",
-                verification_info={'storage_successful': True}
+                verification_info={'storage_successful': True, 'discrepancy_found': False}
             )
             
             return True
         else:
-            print("❌ Storage verification failed - record not found after insert/update")
-            return False
+            # Check for common discrepancies (one day earlier or later)
+            print(f"⚠️ No exact match found. Checking for date discrepancies...")
+            
+            # Check one day earlier (most likely scenario)
+            one_day_earlier = intended_date_obj - timedelta(days=1)
+            earlier_record = execute_query_one(
+                """
+                SELECT id, match_date, availability_status 
+                FROM player_availability 
+                WHERE player_name = %(player)s 
+                AND series_id = %(series_id)s 
+                AND match_date = %(date)s
+                """,
+                {
+                    'player': player_name,
+                    'series_id': series_id,
+                    'date': one_day_earlier
+                }
+            )
+            
+            # Check one day later (less likely but possible)
+            one_day_later = intended_date_obj + timedelta(days=1)
+            later_record = execute_query_one(
+                """
+                SELECT id, match_date, availability_status 
+                FROM player_availability 
+                WHERE player_name = %(player)s 
+                AND series_id = %(series_id)s 
+                AND match_date = %(date)s
+                """,
+                {
+                    'player': player_name,
+                    'series_id': series_id,
+                    'date': one_day_later
+                }
+            )
+            
+            discrepant_record = None
+            discrepancy_type = None
+            
+            if earlier_record and earlier_record['availability_status'] == availability_status:
+                discrepant_record = earlier_record
+                discrepancy_type = "one_day_earlier"
+                discrepant_date = one_day_earlier
+                print(f"🔧 Found record one day earlier: {one_day_earlier} (should be {intended_date_obj})")
+            elif later_record and later_record['availability_status'] == availability_status:
+                discrepant_record = later_record
+                discrepancy_type = "one_day_later" 
+                discrepant_date = one_day_later
+                print(f"🔧 Found record one day later: {one_day_later} (should be {intended_date_obj})")
+            
+            if discrepant_record:
+                print(f"🔧 Correcting date discrepancy ({discrepancy_type})")
+                print(f"   Updating record ID {discrepant_record['id']} from {discrepant_date} to {intended_date_obj}")
+                
+                # Update the discrepant record to have the correct date
+                correction_result = execute_query(
+                    """
+                    UPDATE player_availability 
+                    SET match_date = %(correct_date)s, updated_at = NOW()
+                    WHERE id = %(id)s
+                    """,
+                    {
+                        'correct_date': intended_date_obj,
+                        'id': discrepant_record['id']
+                    }
+                )
+                
+                # Verify the correction worked
+                corrected_verification = execute_query_one(
+                    """
+                    SELECT match_date, availability_status 
+                    FROM player_availability 
+                    WHERE id = %(id)s
+                    """,
+                    {'id': discrepant_record['id']}
+                )
+                
+                if corrected_verification and corrected_verification['match_date'] == intended_date_obj:
+                    print(f"✅ Date correction successful: {corrected_verification['match_date']}")
+                    
+                    # Log the correction
+                    log_date_operation(
+                        operation="POST_STORAGE_CORRECTION",
+                        input_data=f"discrepant_date={discrepant_date}, intended_date={intended_date_obj}",
+                        output_data=f"corrected_date={corrected_verification['match_date']}",
+                        verification_info={
+                            'discrepancy_found': True,
+                            'discrepancy_type': discrepancy_type,
+                            'correction_successful': True
+                        }
+                    )
+                    
+                    return True
+                else:
+                    print(f"❌ Date correction failed")
+                    
+                    # Log the failed correction
+                    log_date_operation(
+                        operation="POST_STORAGE_CORRECTION_FAILED",
+                        input_data=f"discrepant_date={discrepant_date}, intended_date={intended_date_obj}",
+                        output_data="correction_failed",
+                        verification_info={
+                            'discrepancy_found': True,
+                            'discrepancy_type': discrepancy_type,
+                            'correction_successful': False
+                        }
+                    )
+                    
+                    return False
+            else:
+                print("❌ No matching record found (including date discrepancies)")
+                
+                # Log the verification failure
+                log_date_operation(
+                    operation="POST_STORAGE_VERIFICATION_FAILED",
+                    input_data=f"intended_date={intended_date_obj}, status={availability_status}",
+                    output_data="no_record_found",
+                    verification_info={
+                        'storage_successful': False,
+                        'discrepancy_found': False,
+                        'checked_dates': [str(intended_date_obj), str(one_day_earlier), str(one_day_later)]
+                    }
+                )
+                
+                return False
             
     except Exception as e:
         print(f"❌ Error in update_player_availability: {str(e)}")
