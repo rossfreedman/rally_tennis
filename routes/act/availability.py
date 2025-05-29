@@ -19,10 +19,25 @@ from utils.date_verification import (
     log_date_operation
 )
 
-def normalize_date_for_db(date_input, target_timezone='America/Chicago'):
+# Import the correct date utility function
+from utils.date_utils import date_to_db_timestamp
+
+def normalize_date_for_db(date_input, target_timezone='UTC'):
     """
     Normalize date input to a consistent TIMESTAMPTZ format for database storage.
-    Always stores dates at noon in the target timezone to avoid edge cases.
+    After migration to TIMESTAMPTZ, always stores dates at midnight UTC to avoid timezone edge cases.
+    
+    This function now:
+    1. Converts any date input to a datetime object
+    2. Sets the time to midnight (00:00:00)
+    3. Stores as UTC timezone to maintain consistency
+    
+    Args:
+        date_input: String date in various formats or datetime object
+        target_timezone: Target timezone (defaults to 'UTC' for consistency)
+    
+    Returns:
+        datetime: Timezone-aware datetime object at midnight UTC
     """
     try:
         print(f"Normalizing date: {date_input} (type: {type(date_input)})")
@@ -37,20 +52,21 @@ def normalize_date_for_db(date_input, target_timezone='America/Chicago'):
                 dt = datetime.strptime(date_input, '%Y-%m-%d')
         elif isinstance(date_input, datetime):
             dt = date_input
+        elif hasattr(date_input, 'year'):  # Handle date objects
+            dt = datetime.combine(date_input, datetime.min.time())
         else:
             raise ValueError(f"Unsupported date type: {type(date_input)}")
         
-        # Set time to noon to avoid timezone edge cases
-        dt = dt.replace(hour=12, minute=0, second=0, microsecond=0)
+        # Set time to midnight for consistency with TIMESTAMPTZ schema
+        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Localize to target timezone
-        tz = pytz.timezone(target_timezone)
+        # Always store as UTC timezone to avoid conversion issues
         if dt.tzinfo is None:
-            dt = tz.localize(dt)
+            dt = dt.replace(tzinfo=timezone.utc)
         else:
-            dt = dt.astimezone(tz)
+            dt = dt.astimezone(timezone.utc)
         
-        print(f"Normalized to: {dt}")
+        print(f"Normalized to midnight UTC: {dt}")
         return dt
         
     except Exception as e:
@@ -60,12 +76,14 @@ def normalize_date_for_db(date_input, target_timezone='America/Chicago'):
 def get_player_availability(player_name, match_date, series):
     """Get availability for a player on a specific date with verification"""
     try:
-        print(f"\n=== GET PLAYER AVAILABILITY WITH VERIFICATION ===")
-        print(f"Player: {player_name}")
-        print(f"Original date: {match_date}")
-        print(f"Series: {series}")
+        print(f"Getting availability for {player_name} on {match_date} in series {series}")
         
-        # First get the series_id
+        # Convert match_date to proper format for database query
+        # Use the correct UTC conversion function
+        normalized_date = date_to_db_timestamp(match_date)
+        print(f"Normalized date for query: {normalized_date}")
+        
+        # Get series ID
         series_record = execute_query_one(
             "SELECT id FROM series WHERE name = %(series)s",
             {'series': series}
@@ -76,21 +94,19 @@ def get_player_availability(player_name, match_date, series):
             print(f"No series found with name: {series}")
             return None
         
-        # Normalize the date for querying
-        normalized_date = normalize_date_for_db(match_date)
-        
         print(f"Querying availability with parameters:")
         print(f"  player_name: {player_name.strip()}")
         print(f"  match_date: {normalized_date}")
         print(f"  series_id: {series_record['id']}")
         
-        # Query the database
+        # Query the database using simplified date comparison
+        # Since we now store as midnight UTC, we can do a direct date comparison
         result = execute_query_one(
             """
             SELECT availability_status, match_date
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(match_date)s AT TIME ZONE 'America/Chicago')
+            AND DATE(match_date) = DATE(%(match_date)s)
             AND series_id = %(series_id)s
             """,
             {
@@ -180,26 +196,13 @@ def update_player_availability(player_name, match_date, availability_status, ser
         
         series_id = series_record['id']
         
-        # Convert corrected date to date object for database
+        # Convert corrected date to datetime object for database storage
+        # With TIMESTAMPTZ migration, we now store as midnight UTC consistently
         try:
             if isinstance(corrected_date, str):
-                # For Railway PostgreSQL, we need to be more explicit about timezone handling
-                # Convert to a timezone-aware datetime at noon in Chicago timezone
-                from datetime import datetime
-                import pytz
-                
-                # Parse the date string
-                date_obj = datetime.strptime(corrected_date, '%Y-%m-%d').date()
-                
-                # Create a timezone-aware datetime at noon Chicago time
-                chicago_tz = pytz.timezone('America/Chicago')
-                intended_datetime = chicago_tz.localize(datetime.combine(date_obj, datetime.min.time().replace(hour=12)))
-                
-                # For Railway compatibility, store as timezone-aware datetime
-                # This ensures the date is stored correctly regardless of Railway's timezone handling
-                intended_date_obj = intended_datetime
-                
-                print(f"Converted date for Railway storage: {date_obj} -> {intended_datetime}")
+                # Use the correct UTC conversion function
+                intended_date_obj = date_to_db_timestamp(corrected_date)
+                print(f"Converted date for TIMESTAMPTZ storage: {corrected_date} -> {intended_date_obj}")
             else:
                 intended_date_obj = corrected_date
         except Exception as e:
@@ -208,14 +211,14 @@ def update_player_availability(player_name, match_date, availability_status, ser
         
         print(f"Intended date for storage: {intended_date_obj}")
         
-        # Check if record exists
+        # Check if record exists using simplified date comparison
         existing_record = execute_query_one(
             """
             SELECT id, availability_status, match_date
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
-            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+            AND DATE(match_date) = DATE(%(date)s)
             """,
             {
                 'player': player_name,
@@ -251,7 +254,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+                AND DATE(match_date) = DATE(%(date)s)
                 """,
                 {
                     'player': player_name,
@@ -268,7 +271,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+                AND DATE(match_date) = DATE(%(date)s)
                 """,
                 {
                     'player': player_name,
@@ -401,7 +404,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+                AND DATE(match_date) = DATE(%(date)s)
                 """,
                 {
                     'player': player_name,
@@ -418,7 +421,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+                AND DATE(match_date) = DATE(%(date)s)
                 """,
                 {
                     'player': player_name,

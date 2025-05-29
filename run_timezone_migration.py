@@ -17,6 +17,8 @@ import re
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database_utils import execute_query_one, execute_query
+from routes.act.availability import update_player_availability, get_player_availability
+from utils.date_utils import date_to_db_timestamp
 
 def run_migration():
     """Run the timezone migration"""
@@ -65,7 +67,7 @@ def test_timezone_fix():
     
     # Import here to avoid circular imports
     try:
-        from routes.act.availability import normalize_date_for_db, update_player_availability, get_player_availability
+        from routes.act.availability import update_player_availability, get_player_availability
     except ImportError as e:
         print(f"❌ Could not import availability functions: {str(e)}")
         return
@@ -103,7 +105,7 @@ def test_timezone_fix():
             
             # Test date normalization
             try:
-                normalized = normalize_date_for_db(test_case['date'])
+                normalized = date_to_db_timestamp(test_case['date'])
                 print(f"Input: {test_case['date']}")
                 print(f"Normalized: {normalized}")
                 print(f"Expected date part: {test_case['expected_date']}")

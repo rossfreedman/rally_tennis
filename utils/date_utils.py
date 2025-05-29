@@ -12,13 +12,13 @@ APP_TIMEZONE = pytz.timezone('America/Chicago')
 def date_to_db_timestamp(date_obj):
     """
     Convert a date object to a timezone-aware timestamp for database storage.
-    Always stores at noon in the application timezone to avoid DST issues.
+    After TIMESTAMPTZ migration, stores at midnight UTC for consistency.
     
     Args:
         date_obj: datetime.date, datetime.datetime, or string in YYYY-MM-DD format
     
     Returns:
-        datetime: Timezone-aware datetime at noon in APP_TIMEZONE
+        datetime: Timezone-aware datetime at midnight UTC
     """
     if isinstance(date_obj, str):
         # Parse YYYY-MM-DD string
@@ -26,9 +26,9 @@ def date_to_db_timestamp(date_obj):
     elif isinstance(date_obj, datetime):
         date_obj = date_obj.date()
     
-    # Create noon timestamp in application timezone
-    noon_dt = datetime.combine(date_obj, datetime.min.time().replace(hour=12))
-    return APP_TIMEZONE.localize(noon_dt)
+    # Create midnight timestamp in UTC
+    midnight_dt = datetime.combine(date_obj, datetime.min.time())
+    return midnight_dt.replace(tzinfo=timezone.utc)
 
 def db_timestamp_to_date(timestamp_obj):
     """
@@ -116,22 +116,24 @@ def is_same_date(date1, date2):
 # Database query helpers
 def build_date_query(table_alias="", date_column="match_date"):
     """
-    Build SQL for date comparison that handles timezone properly.
+    Build SQL for date comparison with TIMESTAMPTZ columns.
+    
+    After migration to TIMESTAMPTZ with midnight UTC storage, we can use simple DATE() extraction.
     
     Returns:
-        str: SQL fragment like "DATE(match_date AT TIME ZONE 'America/Chicago')"
+        str: SQL fragment like "DATE(match_date)"
     """
     prefix = f"{table_alias}." if table_alias else ""
-    return f"DATE({prefix}{date_column} AT TIME ZONE 'America/Chicago')"
+    return f"DATE({prefix}{date_column})"
 
 def build_date_params(date_value):
     """
-    Build parameters for date queries.
+    Build parameters for date queries with TIMESTAMPTZ columns.
     
     Args:
         date_value: date, datetime, or string
     
     Returns:
-        datetime: Timezone-aware datetime for database queries
+        datetime: Timezone-aware datetime at midnight UTC for database queries
     """
     return date_to_db_timestamp(date_value) 

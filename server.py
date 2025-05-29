@@ -29,7 +29,8 @@ from utils.logging import log_user_activity
 from routes.analyze import init_analyze_routes
 from routes.act import init_act_routes
 from routes.admin import admin_bp
-from routes.act.availability import update_player_availability as act_update_player_availability
+from routes.act.availability import update_player_availability, get_player_availability
+from utils.date_utils import date_to_db_timestamp
 
 def is_public_file(path):
     """Check if a file should be publicly accessible without authentication"""
@@ -5056,7 +5057,7 @@ def serve_mobile_team_schedule():
                                 FROM player_availability 
                                 WHERE player_name = %(player)s 
                                 AND series_id = %(series_id)s 
-                                AND match_date = %(date)s::date
+                                AND DATE(match_date) = DATE(%(date)s)
                             """
                             avail_params = {
                                 'player': player_name,
@@ -5345,7 +5346,7 @@ def serve_all_team_availability():
                     FROM player_availability 
                     WHERE player_name = %(player)s 
                     AND series_id = %(series_id)s 
-                    AND match_date = %(date)s::date
+                    AND DATE(match_date) = DATE(%(date)s)
                 """
                 avail_params = {
                     'player': player_name,
@@ -5426,12 +5427,9 @@ def get_player_availability(player_name, match_date, series):
             
         series_id = series_record[0]['id']
         
-        # Import the normalize function from availability module
-        from routes.act.availability import normalize_date_for_db
-        
         # Normalize the date for consistent comparison
         try:
-            normalized_date = normalize_date_for_db(match_date)
+            normalized_date = date_to_db_timestamp(match_date)
         except Exception as e:
             print(f"❌ Error normalizing date {match_date}: {str(e)}")
             return {'availability_status': 0}
@@ -5442,7 +5440,7 @@ def get_player_availability(player_name, match_date, series):
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
-            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
+            AND DATE(match_date) = DATE(%(date)s)
         """
         params = {
             'player': player_name,
