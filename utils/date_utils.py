@@ -15,14 +15,15 @@ def date_to_db_timestamp(date_obj):
     After TIMESTAMPTZ migration, stores at midnight UTC for consistency.
     
     Args:
-        date_obj: datetime.date, datetime.datetime, or string in YYYY-MM-DD format
+        date_obj: datetime.date, datetime.datetime, or string in various formats (YYYY-MM-DD, MM/DD/YYYY, etc.)
     
     Returns:
         datetime: Timezone-aware datetime at midnight UTC
     """
     if isinstance(date_obj, str):
-        # Parse YYYY-MM-DD string
-        date_obj = datetime.strptime(date_obj, '%Y-%m-%d').date()
+        # First normalize the date string to YYYY-MM-DD format
+        normalized_date_str = normalize_date_string(date_obj)
+        date_obj = datetime.strptime(normalized_date_str, '%Y-%m-%d').date()
     elif isinstance(date_obj, datetime):
         date_obj = date_obj.date()
     
