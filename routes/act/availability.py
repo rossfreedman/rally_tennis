@@ -90,7 +90,7 @@ def get_player_availability(player_name, match_date, series):
             SELECT availability_status, match_date
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND DATE(match_date) = DATE(%(match_date)s)
+            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(match_date)s AT TIME ZONE 'America/Chicago')
             AND series_id = %(series_id)s
             """,
             {
@@ -183,7 +183,23 @@ def update_player_availability(player_name, match_date, availability_status, ser
         # Convert corrected date to date object for database
         try:
             if isinstance(corrected_date, str):
-                intended_date_obj = datetime.strptime(corrected_date, '%Y-%m-%d').date()
+                # For Railway PostgreSQL, we need to be more explicit about timezone handling
+                # Convert to a timezone-aware datetime at noon in Chicago timezone
+                from datetime import datetime
+                import pytz
+                
+                # Parse the date string
+                date_obj = datetime.strptime(corrected_date, '%Y-%m-%d').date()
+                
+                # Create a timezone-aware datetime at noon Chicago time
+                chicago_tz = pytz.timezone('America/Chicago')
+                intended_datetime = chicago_tz.localize(datetime.combine(date_obj, datetime.min.time().replace(hour=12)))
+                
+                # For Railway compatibility, store as timezone-aware datetime
+                # This ensures the date is stored correctly regardless of Railway's timezone handling
+                intended_date_obj = intended_datetime
+                
+                print(f"Converted date for Railway storage: {date_obj} -> {intended_datetime}")
             else:
                 intended_date_obj = corrected_date
         except Exception as e:
@@ -199,7 +215,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
-            AND match_date = %(date)s
+            AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
             """,
             {
                 'player': player_name,
@@ -235,7 +251,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND match_date = %(date)s
+                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
                 """,
                 {
                     'player': player_name,
@@ -252,7 +268,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND match_date = %(date)s
+                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
                 """,
                 {
                     'player': player_name,
@@ -385,7 +401,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND match_date = %(date)s
+                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
                 """,
                 {
                     'player': player_name,
@@ -402,7 +418,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND match_date = %(date)s
+                AND DATE(match_date AT TIME ZONE 'America/Chicago') = DATE(%(date)s AT TIME ZONE 'America/Chicago')
                 """,
                 {
                     'player': player_name,
