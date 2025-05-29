@@ -157,9 +157,6 @@
                         <td class="py-1 px-1 text-xs">
                           <a href="/mobile/player-detail/{{ player.name | urlencode }}" class="font-medium text-primary hover:underline">
                             {{ player.name }}
-                            {% if player.captain %}
-                              <span class="ml-1 px-1 py-0.5 text-xs bg-yellow-200 text-yellow-800 rounded">{{ player.captain }}</span>
-                            {% endif %}
                           </a>
                         </td>
                         <td class="py-1 px-1 text-xs">{{ player.series }}</td>
@@ -167,13 +164,7 @@
                         <td class="py-1 px-1 text-xs">{{ player.losses }}</td>
                         <td class="py-1 px-1 text-xs font-bold {% if player.win_rate >= 60 %}text-green-600{% elif player.win_rate >= 45 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ player.win_rate }}%</td>
                         <td class="py-1 px-1 text-xs">
-                          {% if player.captain == 'C' %}
-                            <span class="text-yellow-600 font-semibold">Captain</span>
-                          {% elif player.captain == 'CC' %}
-                            <span class="text-blue-600 font-semibold">Co-Captain</span>
-                          {% else %}
-                            Player
-                          {% endif %}
+                          Player
                         </td>
                     </tr>
                 {% endfor %}

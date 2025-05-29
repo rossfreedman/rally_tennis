@@ -3260,6 +3260,14 @@ def mobile_teams_players():
     team = request.args.get('team')
     print(f"DEBUG: Received team parameter: '{team}'")
     
+    # Get user's series from session
+    user = session.get('user')
+    if not user:
+        return redirect(url_for('login'))
+    
+    user_series = user.get('series')
+    print(f"DEBUG: User series: '{user_series}'")
+    
     # Load players data
     players_path = 'data/players.json'
     stats_path = 'data/series_stats.json'
@@ -3274,8 +3282,15 @@ def mobile_teams_players():
     with open(matches_path) as f:
         all_matches = json.load(f)
     
-    # Filter out BYE teams
-    all_teams = sorted({s['team'] for s in all_stats if 'BYE' not in s['team'].upper()})
+    # Filter teams by user's series and exclude BYE teams
+    if user_series:
+        all_teams = sorted({s['team'] for s in all_stats 
+                          if s.get('series') == user_series and 'BYE' not in s['team'].upper()})
+        print(f"DEBUG: Found {len(all_teams)} teams in user's series '{user_series}'")
+    else:
+        # Fallback: show all teams if no series found (shouldn't happen in normal operation)
+        all_teams = sorted({s['team'] for s in all_stats if 'BYE' not in s['team'].upper()})
+        print(f"DEBUG: No user series found, showing all {len(all_teams)} teams")
     
     if not team:
         # No team selected
