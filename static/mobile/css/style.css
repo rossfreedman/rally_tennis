@@ -534,6 +534,7 @@ a:hover {
   border-radius: 0.5rem;
   padding: 0 1rem;
   box-sizing: border-box;
+  white-space: nowrap; /* Prevent text wrapping */
 }
 
 .practice-label {
