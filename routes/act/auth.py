@@ -84,14 +84,63 @@ def init_routes(app):
                 if existing_user:
                     return jsonify({'error': 'User already exists'}), 409
 
-                # Insert new user
-                success = execute_update(
+                # Check which password columns exist in the database
+                try:
+                    available_cols = execute_query("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'users' 
+                        AND column_name IN ('password', 'password_hash')
+                        AND table_schema = 'public'
+                    """)
+                    available_password_cols = [col['column_name'] for col in available_cols]
+                    
+                    # Build INSERT statement based on available columns
+                    if 'password' in available_password_cols and 'password_hash' in available_password_cols:
+                        # Both columns exist (Railway production schema)
+                        insert_sql = """
+                            INSERT INTO users (email, password, password_hash, first_name, last_name, club_id, series_id, is_admin)
+                            VALUES (%(email)s, %(password)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
+                        """
+                        insert_params = {
+                            'email': email,
+                            'password': hashed_password,
+                            'password_hash': hashed_password,
+                            'first_name': first_name,
+                            'last_name': last_name,
+                            'club_id': club_id,
+                            'series_id': series_id,
+                            'is_admin': False
+                        }
+                    elif 'password_hash' in available_password_cols:
+                        # Only password_hash exists (modern schema)
+                        insert_sql = """
+                            INSERT INTO users (email, password_hash, first_name, last_name, club_id, series_id, is_admin)
+                            VALUES (%(email)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
+                        """
+                        insert_params = {
+                            'email': email,
+                            'password_hash': hashed_password,
+                            'first_name': first_name,
+                            'last_name': last_name,
+                            'club_id': club_id,
+                            'series_id': series_id,
+                            'is_admin': False
+                        }
+                    else:
+                        logger.error("No suitable password column found in users table")
+                        return jsonify({'error': 'Database schema error'}), 500
+                    
+                except Exception as schema_error:
+                    logger.error(f"Error checking database schema: {str(schema_error)}")
+                    # Fallback to both columns for safety
+                    insert_sql = """
+                        INSERT INTO users (email, password, password_hash, first_name, last_name, club_id, series_id, is_admin)
+                        VALUES (%(email)s, %(password)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
                     """
-                    INSERT INTO users (email, password_hash, first_name, last_name, club_id, series_id, is_admin)
-                    VALUES (%(email)s, %(password_hash)s, %(first_name)s, %(last_name)s, %(club_id)s, %(series_id)s, %(is_admin)s)
-                    """,
-                    {
+                    insert_params = {
                         'email': email,
+                        'password': hashed_password,
                         'password_hash': hashed_password,
                         'first_name': first_name,
                         'last_name': last_name,
@@ -99,7 +148,9 @@ def init_routes(app):
                         'series_id': series_id,
                         'is_admin': False
                     }
-                )
+
+                # Insert new user
+                success = execute_update(insert_sql, insert_params)
 
                 if not success:
                     logger.error("Failed to insert new user")
