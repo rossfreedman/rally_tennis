@@ -68,8 +68,8 @@
                     <table class="min-w-full table-auto">
                         <thead>
                             <tr class="bg-gray-100">
-                                <th class="px-4 py-2 text-left font-semibold">Player</th>
-                                <th class="px-4 py-2 text-left font-semibold">Availability</th>
+                                <th class="px-4 py-2 text-left font-semibold w-1/2">Player</th>
+                                <th class="px-4 py-2 text-left font-semibold w-1/2">Availability</th>
                             </tr>
                         </thead>
                         <tbody id="singleTableBody">
@@ -89,14 +89,14 @@
                         <table class="min-w-full table-auto">
                             <thead>
                                 <tr class="bg-gray-100">
-                                    <th class="px-4 py-2 text-left">Date</th>
-                                    <th class="px-4 py-2 text-left">Availability</th>
+                                    <th class="px-4 py-2 text-left w-1/2">Date</th>
+                                    <th class="px-4 py-2 text-left w-1/2">Availability</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for date in dates %}
                                     <tr class="border-t date-row" data-date="{{ date.date }}">
-                                        <td class="px-4 py-2">
+                                        <td class="px-4 py-2 w-1/2">
                                             <div class="font-medium">{{ date.date | pretty_date }}</div>
                                             {% if date.event_type == 'Practice' %}
                                                 <div class="text-sm text-blue-600 mt-1">
@@ -111,22 +111,22 @@
                                                 </div>
                                             {% endif %}
                                         </td>
-                                        <td class="px-4 py-2">
+                                        <td class="px-4 py-2 w-1/2">
                                             {% if date.availability_status == 1 %}
-                                                <span class="text-green-600 font-medium">
-                                                    <i class="fas fa-check-circle mr-1"></i>Available
+                                                <span class="text-green-600 font-medium text-sm whitespace-nowrap flex items-center">
+                                                    <i class="fas fa-check-circle mr-1 text-xs"></i>Available
                                                 </span>
                                             {% elif date.availability_status == 2 %}
-                                                <span class="text-red-600 font-medium">
-                                                    <i class="fas fa-times-circle mr-1"></i>Not Available
+                                                <span class="text-red-600 font-medium text-sm whitespace-nowrap flex items-center">
+                                                    <i class="fas fa-times-circle mr-1 text-xs"></i>Not Available
                                                 </span>
                                             {% elif date.availability_status == 3 %}
-                                                <span class="text-yellow-500 font-medium">
-                                                    <i class="fas fa-question-circle mr-1"></i>Not Sure
+                                                <span class="text-yellow-500 font-medium text-sm whitespace-nowrap flex items-center">
+                                                    <i class="fas fa-question-circle mr-1 text-xs"></i>Not Sure
                                                 </span>
                                             {% else %}
-                                                <span class="text-gray-400">
-                                                    <i class="fas fa-minus-circle mr-1"></i>Not Set
+                                                <span class="text-gray-400 text-sm whitespace-nowrap flex items-center">
+                                                    <i class="fas fa-minus-circle mr-1 text-xs"></i>Not Set
                                                 </span>
                                             {% endif %}
                                         </td>
@@ -288,15 +288,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (foundEntry) {
                 let statusHtml = '';
                 if (foundEntry.availability_status === 1) {
-                    statusHtml = '<span class="text-green-600 font-medium"><i class="fas fa-check-circle mr-1"></i>Available</span>';
+                    statusHtml = '<span class="text-green-600 font-medium text-sm whitespace-nowrap flex items-center"><i class="fas fa-check-circle mr-1 text-xs"></i>Available</span>';
                 } else if (foundEntry.availability_status === 2) {
-                    statusHtml = '<span class="text-red-600 font-medium"><i class="fas fa-times-circle mr-1"></i>Not Available</span>';
+                    statusHtml = '<span class="text-red-600 font-medium text-sm whitespace-nowrap flex items-center"><i class="fas fa-times-circle mr-1 text-xs"></i>Not Available</span>';
                 } else if (foundEntry.availability_status === 3) {
-                    statusHtml = '<span class="text-yellow-500 font-medium"><i class="fas fa-question-circle mr-1"></i>Not Sure</span>';
+                    statusHtml = '<span class="text-yellow-500 font-medium text-sm whitespace-nowrap flex items-center"><i class="fas fa-question-circle mr-1 text-xs"></i>Not Sure</span>';
                 } else {
-                    statusHtml = '<span class="text-gray-400"><i class="fas fa-minus-circle mr-1"></i>Not Set</span>';
+                    statusHtml = '<span class="text-gray-400 text-sm whitespace-nowrap flex items-center"><i class="fas fa-minus-circle mr-1 text-xs"></i>Not Set</span>';
                 }
-                const row = `<tr class=\"border-t\">\n                    <td class=\"px-4 py-2\">${playerObj.player}</td>\n                    <td class=\"px-4 py-2\">${statusHtml}</td>\n                </tr>`;
+                const row = `<tr class=\"border-t\">\n                    <td class=\"px-4 py-2 w-1/2\">${playerObj.player}</td>\n                    <td class=\"px-4 py-2 w-1/2\">${statusHtml}</td>\n                </tr>`;
                 singleTableBody.insertAdjacentHTML('beforeend', row);
             }
         });
