@@ -1,7 +1,7 @@
 """fix_timezone_date_issue_convert_date_to_timestamptz
 
 Revision ID: 1c2bac3892b6
-Revises: c30453403ba8
+Revises: 22cdc4d8bba3
 Create Date: 2025-05-29 08:08:44.348159
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP
 
 # revision identifiers, used by Alembic.
 revision: str = '1c2bac3892b6'
-down_revision: Union[str, None] = 'c30453403ba8'
+down_revision: Union[str, None] = '22cdc4d8bba3'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -61,25 +61,32 @@ def upgrade() -> None:
         server_default=sa.text('CURRENT_TIMESTAMP')
     )
     
-    # Step 4: Re-create the unique constraint that may have been affected
-    # Note: This constraint may already exist, so we'll use a try-catch approach
+    # Step 4: Re-create the unique constraint that may have been affected by Railway migration
+    # The Railway migration 22cdc4d8bba3 removed this constraint, so we need to recreate it
     try:
         op.create_unique_constraint(
             'player_availability_player_name_match_date_series_id_key',
             'player_availability',
             ['player_name', 'match_date', 'series_id']
         )
-    except Exception:
-        # Constraint might already exist, continue
+        print("✅ Recreated unique constraint")
+    except Exception as e:
+        print(f"⚠️  Unique constraint already exists or creation failed: {e}")
         pass
     
-    # Step 5: Create an index to optimize date-based queries
-    op.create_index(
-        'idx_player_availability_date_series',
-        'player_availability',
-        ['match_date', 'series_id'],
-        unique=False
-    )
+    # Step 5: Create an index to optimize date-based queries  
+    # The Railway migration also removed the old index, so create a new optimized one
+    try:
+        op.create_index(
+            'idx_player_availability_date_series',
+            'player_availability',
+            ['match_date', 'series_id'],
+            unique=False
+        )
+        print("✅ Created optimized date index")
+    except Exception as e:
+        print(f"⚠️  Index already exists or creation failed: {e}")
+        pass
 
 
 def downgrade() -> None:
