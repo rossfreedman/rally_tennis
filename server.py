@@ -5057,7 +5057,7 @@ def serve_mobile_team_schedule():
                                 FROM player_availability 
                                 WHERE player_name = %(player)s 
                                 AND series_id = %(series_id)s 
-                                AND DATE(match_date) = DATE(%(date)s)
+                                AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                             """
                             avail_params = {
                                 'player': player_name,
@@ -5346,7 +5346,7 @@ def serve_all_team_availability():
                     FROM player_availability 
                     WHERE player_name = %(player)s 
                     AND series_id = %(series_id)s 
-                    AND DATE(match_date) = DATE(%(date)s)
+                    AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                 """
                 avail_params = {
                     'player': player_name,

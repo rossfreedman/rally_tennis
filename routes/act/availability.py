@@ -99,14 +99,14 @@ def get_player_availability(player_name, match_date, series):
         print(f"  match_date: {normalized_date}")
         print(f"  series_id: {series_record['id']}")
         
-        # Query the database using simplified date comparison
-        # Since we now store as midnight UTC, we can do a direct date comparison
+        # Query the database using timezone-aware date comparison
+        # Since we now store as TIMESTAMPTZ at midnight UTC, we need to compare dates in UTC
         result = execute_query_one(
             """
             SELECT availability_status, match_date
             FROM player_availability 
             WHERE player_name = %(player_name)s 
-            AND DATE(match_date) = DATE(%(match_date)s)
+            AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(match_date)s AT TIME ZONE 'UTC')
             AND series_id = %(series_id)s
             """,
             {
@@ -211,14 +211,14 @@ def update_player_availability(player_name, match_date, availability_status, ser
         
         print(f"Intended date for storage: {intended_date_obj}")
         
-        # Check if record exists using simplified date comparison
+        # Check if record exists using timezone-aware date comparison
         existing_record = execute_query_one(
             """
             SELECT id, availability_status, match_date
             FROM player_availability 
             WHERE player_name = %(player)s 
             AND series_id = %(series_id)s 
-            AND DATE(match_date) = DATE(%(date)s)
+            AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
             """,
             {
                 'player': player_name,
@@ -254,7 +254,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date) = DATE(%(date)s)
+                AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                 """,
                 {
                     'player': player_name,
@@ -271,7 +271,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date) = DATE(%(date)s)
+                AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                 """,
                 {
                     'player': player_name,
@@ -404,7 +404,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date) = DATE(%(date)s)
+                AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                 """,
                 {
                     'player': player_name,
@@ -421,7 +421,7 @@ def update_player_availability(player_name, match_date, availability_status, ser
                 FROM player_availability 
                 WHERE player_name = %(player)s 
                 AND series_id = %(series_id)s 
-                AND DATE(match_date) = DATE(%(date)s)
+                AND DATE(match_date AT TIME ZONE 'UTC') = DATE(%(date)s AT TIME ZONE 'UTC')
                 """,
                 {
                     'player': player_name,
