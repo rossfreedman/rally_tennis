@@ -1,34 +1,38 @@
 {
-  "total_players": 142,
-  "total_teams": 5,
-  "teams_scraped": [
-    {
-      "name": "Birchwood S2B",
-      "club": "Birchwood",
-      "location_id": "NSTF_BIRCHWOOD"
-    },
-    {
-      "name": "Lake Forest S2B",
-      "club": "Lake Forest",
-      "location_id": "NSTF_LAKE_FOREST"
-    },
-    {
-      "name": "Ravinia Green S2B",
-      "club": "Ravinia Green",
-      "location_id": "NSTF_RAVINIA_GREEN"
-    },
-    {
-      "name": "Tennaqua S2B",
-      "club": "Tennaqua",
-      "location_id": "NSTF_TENNAQUA"
-    },
-    {
-      "name": "Winnetka S2B",
-      "club": "Winnetka",
-      "location_id": "NSTF_WINNETKA"
-    }
+  "total_players": 702,
+  "total_teams": 23,
+  "series_scraped": [
+    "Series 1",
+    "Series 2A",
+    "Series 2B",
+    "Series 3"
   ],
-  "scraped_at": "2025-05-29T09:16:28.722630",
-  "series": "Series 2B",
+  "teams_scraped": [
+    "Birchwood S1",
+    "Midtown S1",
+    "Tennaqua S1",
+    "Wilmette S1 T1",
+    "Wilmette S1 T2",
+    "Exmoor S2A",
+    "Midtown S2A",
+    "Northmoor S2A",
+    "Old Willow S2A",
+    "Skokie S2A",
+    "Tennaqua S2A",
+    "Birchwood S2B",
+    "Lake Forest S2B",
+    "Ravinia Green S2B",
+    "Tennaqua S2B",
+    "Wilmette S2B",
+    "Winnetka S2B",
+    "Birchwood S3",
+    "Lake Forest S3",
+    "Old Willow S3",
+    "Skokie S3",
+    "Tennaqua S3",
+    "Valley Lo S3"
+  ],
+  "scraped_at": "2025-05-30T08:56:58.424037",
+  "detailed_stats": true,
   "league": "NSTF"
 }
