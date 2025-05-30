@@ -14,6 +14,14 @@
         </div>
     </div>
 
+    <!-- Link to Team Schedule -->
+    <div class="pl-4 pr-0 mb-3 flex justify-end">
+        <a href="/mobile/team-schedule" class="inline-flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium">
+            <i class="fas fa-calendar-alt text-xs"></i>
+            <span>View Team Availability - All Dates</span>
+        </a>
+    </div>
+
     <!-- Match Cards -->
     <div class="space-y-1 mt-[15px]" id="availability-list">
         {% set last_date = None %}
@@ -73,9 +81,12 @@
                                 {% endif %}
                             </div>
                             <div class="mt-2">
-                                <a href="{{ url_for('serve_all_team_availability', date=match.date) }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500 text-white rounded-full text-xs font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                                <a href="{{ url_for('serve_all_team_availability', date=match.date) }}" class="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-medium hover:bg-blue-700 transition-colors">
                                     <i class="fas fa-users text-[6px]"></i>
-                                    View all availability
+                                    <span class="text-left leading-tight">
+                                        View team availability<br>
+                                        on {{ match.date | pretty_date_no_year }}
+                                    </span>
                                 </a>
                             </div>
                         </div>

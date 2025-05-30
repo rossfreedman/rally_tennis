@@ -5093,15 +5093,46 @@ def serve_logout_js():
 @app.route('/mobile/team-schedule')
 @login_required
 def serve_mobile_team_schedule():
-    """Serve the team schedule page showing all players and their schedules"""
+    """Serve the team schedule page with loading screen"""
     try:
-        print("\n=== TEAM SCHEDULE PAGE REQUEST ===")
+        user = session.get('user')
+        if not user:
+            flash('Please log in first', 'error')
+            return redirect(url_for('login'))
+            
+        club_name = user.get('club')
+        series = user.get('series')
+        
+        if not club_name or not series:
+            flash('Please set your club and series in your profile settings', 'error')
+            return redirect(url_for('serve_mobile_view_schedule'))
+
+        # Create a clean team name string for the title
+        team_name = f"{club_name} - {series}"
+        
+        return render_template(
+            'mobile/team_schedule.html',
+            team=team_name,
+            session_data={'user': user}
+        )
+        
+    except Exception as e:
+        print(f"❌ Error in serve_mobile_team_schedule: {str(e)}")
+        print(traceback.format_exc())
+        flash('An error occurred while loading the team schedule', 'error')
+        return redirect(url_for('serve_mobile_view_schedule'))
+
+@app.route('/api/team-schedule-data')
+@login_required
+def get_team_schedule_data():
+    """API endpoint to get team schedule data asynchronously"""
+    try:
+        print("\n=== TEAM SCHEDULE DATA API REQUEST ===")
         # Get the team from user's session data
         user = session.get('user')
         if not user:
             print("❌ No user in session")
-            flash('Please log in first', 'error')
-            return redirect(url_for('login'))
+            return jsonify({'error': 'Not authenticated'}), 401
             
         club_name = user.get('club')
         series = user.get('series')
@@ -5111,19 +5142,14 @@ def serve_mobile_team_schedule():
         
         if not club_name or not series:
             print("❌ Missing club or series")
-            print(f"Club: {club_name}, Series: {series}")
-            print(f"Full user object: {user}")
-            flash('Please set your club and series in your profile settings', 'error')
-            return redirect(url_for('serve_mobile_view_schedule'))
+            return jsonify({'error': 'Club or series not set in profile'}), 400
 
         # Get series ID first since we want all players in the series
         series_query = "SELECT id, name FROM series WHERE name = %(name)s"
         print(f"Executing series query: {series_query}")
-        print(f"Query params: {{'name': {series}}}")
         
         try:
             series_record = execute_query(series_query, {'name': series})
-            print(f"Series query result: {series_record}")
         except Exception as e:
             print(f"❌ Database error querying series: {e}")
             # Continue without database series ID - we can still show the schedule
@@ -5157,17 +5183,11 @@ def serve_mobile_team_schedule():
             
             if not team_players:
                 print("❌ No players found in players.json")
-                print(f"Looking for Series: '{series}' and Club: '{club_name}'")
-                print(f"Available series in players.json: {list(set(p.get('Series') for p in all_players))}")
-                print(f"Available clubs in players.json: {list(set(p.get('Club') for p in all_players))}")
-                flash('No players found for your team', 'warning')
-                return redirect(url_for('serve_mobile_view_schedule'))
+                return jsonify({'error': f'No players found for {club_name} - {series}'}), 404
                 
         except Exception as e:
             print(f"❌ Error reading players.json: {e}")
-            print(traceback.format_exc())
-            flash('Error loading player data', 'error')
-            return redirect(url_for('serve_mobile_view_schedule'))
+            return jsonify({'error': 'Error loading player data'}), 500
 
         # Get match and practice dates from schedules.json
         try:
@@ -5176,8 +5196,7 @@ def serve_mobile_team_schedule():
             
             if not os.path.exists(matches_path):
                 print(f"❌ Schedules file not found: {matches_path}")
-                flash('Schedule file not found', 'error')
-                return redirect(url_for('serve_mobile_view_schedule'))
+                return jsonify({'error': 'Schedule file not found'}), 500
                 
             with open(matches_path, 'r') as f:
                 all_events = json.load(f)
@@ -5270,18 +5289,11 @@ def serve_mobile_team_schedule():
             
             if not event_dates:
                 print("❌ No event dates found for series and club")
-                print(f"Looking for series: '{series}' and club: '{club_name}'")
-                print(f"Available series in schedules.json: {list(set(e.get('series') for e in all_events))}")
-                print(f"Available practice locations: {list(set(e.get('location') for e in all_events if e.get('type') == 'Practice'))}")
-                print(f"Sample events: {all_events[:3] if all_events else 'None'}")
-                flash('No matches or practices found for your team', 'warning')
-                return redirect(url_for('serve_mobile_view_schedule'))
+                return jsonify({'error': 'No matches or practices found for your team'}), 404
             
         except Exception as e:
             print(f"❌ Error reading schedules.json: {e}")
-            print(traceback.format_exc())
-            flash('Error loading schedule', 'error')
-            return redirect(url_for('serve_mobile_view_schedule'))
+            return jsonify({'error': 'Error loading schedule'}), 500
 
         players_schedule = {}
         print("\nProcessing player availability:")
@@ -5343,32 +5355,22 @@ def serve_mobile_team_schedule():
 
         if not players_schedule:
             print("❌ No player schedules created")
-            flash('No player schedules found for your series', 'warning')
-            return redirect(url_for('serve_mobile_view_schedule'))
+            return jsonify({'error': 'No player schedules found for your series'}), 404
             
         print(f"\n✓ Final players_schedule has {len(players_schedule)} players")
-        print(f"✓ Event details for {len(event_details)} dates:")
-        for date, details in list(event_details.items())[:3]:  # Show first 3 for debugging
-            print(f"  {date}: {details.get('type', 'Unknown')} - {details.get('opponent', details.get('description', 'N/A'))}")
-            
-        # Create a clean team name string for the title
-        team_name = f"{club_name} - {series}"
-        print(f"\nRendering template with team: {team_name}")
+        print(f"✓ Event details for {len(event_details)} dates")
         
-        return render_template(
-            'mobile/team_schedule.html',
-            team=team_name,
-            players_schedule=players_schedule,
-            session_data={'user': user},
-            match_dates=event_dates,  # Add event_dates (matches + practices) to the template context
-            event_details=event_details  # Add event details for displaying type and opponent info
-        )
+        # Return JSON response
+        return jsonify({
+            'players_schedule': players_schedule,
+            'match_dates': event_dates,
+            'event_details': event_details
+        })
         
     except Exception as e:
-        print(f"❌ Error in serve_mobile_team_schedule: {str(e)}")
+        print(f"❌ Error in get_team_schedule_data: {str(e)}")
         print(traceback.format_exc())
-        flash('An error occurred while loading the team schedule', 'error')
-        return redirect(url_for('serve_mobile_view_schedule'))
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/mobile/reserve-court')
 @login_required
@@ -6124,6 +6126,42 @@ def debug_user_series():
         'user_email': user.get('email'),
         'expected_substitutes': 'Series 1: 13 subs available | Series 2B/3: 0 subs available at Tennaqua'
     })
+
+@app.template_filter('strip_leading_zero')
+def strip_leading_zero(value):
+    """
+    Removes leading zero from hour in a time string like '06:30 pm' -> '6:30 pm'
+    """
+    import re
+    return re.sub(r'^0', '', value) if isinstance(value, str) else value
+
+@app.template_filter('pretty_date_no_year')
+def pretty_date_no_year(value):
+    """Format dates for display without the year"""
+    try:
+        if isinstance(value, str):
+            # Try different date formats
+            formats = ['%Y-%m-%d', '%m/%d/%Y', '%d-%b-%y']
+            date_obj = None
+            for fmt in formats:
+                try:
+                    date_obj = datetime.strptime(value, fmt)
+                    break
+                except ValueError:
+                    continue
+            if not date_obj:
+                return value
+        else:
+            date_obj = value
+        
+        # Format without year
+        day_of_week = date_obj.strftime('%A')
+        date_str = date_obj.strftime('%-m/%-d')
+        return f"{day_of_week} {date_str}"
+        
+    except Exception as e:
+        print(f"[PRETTY_DATE_NO_YEAR] Error formatting date: {e}")
+        return str(value)
 
 if __name__ == '__main__':
     # Get port from environment variable or use default
