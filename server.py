@@ -205,16 +205,18 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 from utils.auth import login_required
 
 def read_all_player_data():
-    """Read and return all player data from the CSV file"""
+    """Read and return all player data from the JSON file"""
     try:
         import os
-        csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'all_tennaqua_players.csv')
-        df = pd.read_csv(csv_path)
-        print(f"Successfully loaded {len(df)} player records")
-        return df
+        import json
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'players.json')
+        with open(json_path, 'r') as f:
+            players = json.load(f)
+        print(f"Successfully loaded {len(players)} player records from JSON")
+        return players
     except Exception as e:
         print(f"Error reading player data: {str(e)}")
-        return pd.DataFrame()
+        return []
 
 # DISABLED FOR RAILWAY DEPLOYMENT - OpenAI assistant functionality removed
 # def get_or_create_assistant():
@@ -1066,12 +1068,27 @@ def get_all_substitute_players():
                 is_higher_series = True
             
             if is_higher_series:
-                eligible_players.append(player)
+                # Format player data in the same structure as regular players endpoint
+                player_name = f"{player['First Name']} {player['Last Name']}"
+                player_data = {
+                    'name': player_name,
+                    'series': player.get('Series', ''),
+                    'rating': str(player.get('PTI', '')),
+                    'wins': str(player.get('Wins', 0)),
+                    'losses': str(player.get('Losses', 0)),
+                    'winRate': player.get('Win %', '0')
+                }
+                # Add preferred courts if available
+                if 'Preferred Courts' in player:
+                    player_data['preferredCourts'] = player['Preferred Courts']
+                eligible_players.append(player_data)
         
         return jsonify(eligible_players)
         
     except Exception as e:
         print(f"Error in get_all_substitute_players: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/players')
