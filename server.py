@@ -5243,16 +5243,21 @@ def get_team_schedule_data():
                                 # Convert from MM/DD/YYYY to YYYY-MM-DD
                                 date_obj = datetime.strptime(event_date, '%m/%d/%Y')
                                 formatted_date = date_obj.strftime('%Y-%m-%d')
-                                event_dates.append(formatted_date)
                                 
-                                # Store event details
-                                event_details[formatted_date] = {
-                                    'type': 'Practice',
-                                    'description': event.get('description', 'Team Practice'),
-                                    'location': practice_location,
-                                    'time': event.get('time', '')
-                                }
-                                print(f"✓ Added practice date: {event_date}")
+                                # Only add practice details if we don't already have match details for this date
+                                if formatted_date not in event_details:
+                                    event_dates.append(formatted_date)
+                                    
+                                    # Store event details
+                                    event_details[formatted_date] = {
+                                        'type': 'Practice',
+                                        'description': event.get('description', 'Team Practice'),
+                                        'location': practice_location,
+                                        'time': event.get('time', '')
+                                    }
+                                    print(f"✓ Added practice date: {event_date}")
+                                else:
+                                    print(f"Skipping practice on {event_date} - match already scheduled")
                             except ValueError as e:
                                 print(f"Invalid practice date format: {event_date}, error: {e}")
                                 continue
@@ -5261,36 +5266,41 @@ def get_team_schedule_data():
                     match_series = event.get('series', '')
                     
                     if match_series == series:
-                        if event_date:
+                        home_team = event.get('home_team', '')
+                        away_team = event.get('away_team', '')
+                        
+                        # Extract club name from team names (remove series suffix like "S2B")
+                        series_suffix = series.replace('Series ', 'S')
+                        home_club = home_team.replace(f" {series_suffix}", '').strip()
+                        away_club = away_team.replace(f" {series_suffix}", '').strip()
+                        
+                        # Only process this match if the user's club is actually playing in it
+                        is_user_club_playing = (home_club == club_name or away_club == club_name or 
+                                              club_name in home_team or club_name in away_team)
+                        
+                        if is_user_club_playing and event_date:
                             try:
                                 # Convert from MM/DD/YYYY to YYYY-MM-DD
                                 date_obj = datetime.strptime(event_date, '%m/%d/%Y')
                                 formatted_date = date_obj.strftime('%Y-%m-%d')
-                                event_dates.append(formatted_date)
                                 
                                 # Determine opponent for this club
-                                home_team = event.get('home_team', '')
-                                away_team = event.get('away_team', '')
                                 opponent = ''
-                                
-                                # Extract club name from team names (remove series suffix like "S2B")
-                                home_club = home_team.replace(f" {series.replace('Series ', 'S')}", '').strip()
-                                away_club = away_team.replace(f" {series.replace('Series ', 'S')}", '').strip()
-                                
                                 if home_club == club_name:
                                     opponent = away_club
                                 elif away_club == club_name:
                                     opponent = home_club
+                                elif club_name in home_team:
+                                    opponent = away_club
+                                elif club_name in away_team:
+                                    opponent = home_club
                                 else:
-                                    # If club name doesn't match exactly, try to find it in the team names
-                                    if club_name in home_team:
-                                        opponent = away_club
-                                    elif club_name in away_team:
-                                        opponent = home_club
-                                    else:
-                                        opponent = f"{home_club} vs {away_club}"
+                                    # Fallback - shouldn't happen with our filtering above
+                                    opponent = "TBD"
                                 
-                                # Store event details
+                                event_dates.append(formatted_date)
+                                
+                                # Store event details only for matches where this club is playing
                                 event_details[formatted_date] = {
                                     'type': 'Match',
                                     'opponent': opponent,
@@ -5299,7 +5309,7 @@ def get_team_schedule_data():
                                     'location': event.get('location', ''),
                                     'time': event.get('time', '')
                                 }
-                                print(f"✓ Added match date: {event_date} - {opponent}")
+                                print(f"✓ Added match date: {event_date} - {club_name} vs {opponent}")
                             except ValueError as e:
                                 print(f"Invalid match date format: {event_date}, error: {e}")
                                 continue
