@@ -2545,13 +2545,24 @@ def get_player_analysis(user):
                 continue
                 
             total_matches += 1
-            is_home = any(normalize(mp) == player_name_normal for mp in [
+            # Correctly determine if player is on home team vs away team
+            is_home_player = any(normalize(mp) == player_name_normal for mp in [
                 match.get('Home Player 1', '').strip(),
-                match.get('Home Player 2', '').strip(),
+                match.get('Home Player 2', '').strip()
+            ] if mp)
+            is_away_player = any(normalize(mp) == player_name_normal for mp in [
                 match.get('Away Player 1', '').strip(),
                 match.get('Away Player 2', '').strip()
             ] if mp)
-            won = (is_home and match.get('Winner') == 'home') or (not is_home and match.get('Winner') == 'away')
+            
+            # Player should be on exactly one team
+            if is_home_player:
+                won = match.get('Winner') == 'home'
+            elif is_away_player:
+                won = match.get('Winner') == 'away'
+            else:
+                # This shouldn't happen if we found the player in the match
+                won = False
             
             if won:
                 wins += 1
@@ -2561,16 +2572,18 @@ def get_player_analysis(user):
                 court_stats[court_key]['losses'] += 1
             court_stats[court_key]['matches'] += 1
             
-            # Identify partner
+            # Identify partner - look on the same team as the player
             partner = None
-            if normalize(match.get('Home Player 1', '').strip()) == player_name_normal:
-                partner = match.get('Home Player 2', '').strip()
-            elif normalize(match.get('Home Player 2', '').strip()) == player_name_normal:
-                partner = match.get('Home Player 1', '').strip()
-            elif normalize(match.get('Away Player 1', '').strip()) == player_name_normal:
-                partner = match.get('Away Player 2', '').strip()
-            elif normalize(match.get('Away Player 2', '').strip()) == player_name_normal:
-                partner = match.get('Away Player 1', '').strip()
+            if is_home_player:
+                if normalize(match.get('Home Player 1', '').strip()) == player_name_normal:
+                    partner = match.get('Home Player 2', '').strip()
+                elif normalize(match.get('Home Player 2', '').strip()) == player_name_normal:
+                    partner = match.get('Home Player 1', '').strip()
+            elif is_away_player:
+                if normalize(match.get('Away Player 1', '').strip()) == player_name_normal:
+                    partner = match.get('Away Player 2', '').strip()
+                elif normalize(match.get('Away Player 2', '').strip()) == player_name_normal:
+                    partner = match.get('Away Player 1', '').strip()
             
             if partner:
                 court_stats[court_key]['partners'][partner] += 1
@@ -2726,7 +2739,11 @@ def research_me():
             # Calculate wins/losses
             wins = 0
             for match in player_matches:
-                is_home = (match.get('Home Player 1','').lower() == player_name_normal or match.get('Home Player 2','').lower() == player_name_normal or match.get('Home Player 1','').lower() == player_last_first or match.get('Home Player 2','').lower() == player_last_first)
+                # Correctly determine if player is on home team vs away team
+                is_home = (normalize(match.get('Home Player 1','')) == player_name_normal or 
+                          normalize(match.get('Home Player 2','')) == player_name_normal or 
+                          normalize(match.get('Home Player 1','')) == player_last_first or 
+                          normalize(match.get('Home Player 2','')) == player_last_first)
                 winner = match.get('Winner','').lower()
                 if (is_home and winner == 'home') or (not is_home and winner == 'away'):
                     wins += 1
@@ -2832,7 +2849,7 @@ def research_me():
         losses = 0
         partner_stats = defaultdict(lambda: {'wins': 0, 'losses': 0, 'matches': 0})
         for match in matches:
-            is_home = player_name in [match.get('Home Player 1'), match.get('Home Player 2')]
+            is_home = (normalize(player_name) in [normalize(match.get('Home Player 1', '')), normalize(match.get('Home Player 2', ''))])
             won = (is_home and match.get('Winner') == 'home') or (not is_home and match.get('Winner') == 'away')
             if won:
                 wins += 1
@@ -2840,9 +2857,9 @@ def research_me():
                 losses += 1
             # Identify partner
             if is_home:
-                partner = match.get('Home Player 2') if match.get('Home Player 1') == player_name else match.get('Home Player 1')
+                partner = match.get('Home Player 2') if normalize(match.get('Home Player 1', '')) == normalize(player_name) else match.get('Home Player 1')
             else:
-                partner = match.get('Away Player 2') if match.get('Away Player 1') == player_name else match.get('Away Player 1')
+                partner = match.get('Away Player 2') if normalize(match.get('Away Player 1', '')) == normalize(player_name) else match.get('Away Player 1')
             if partner:
                 partner_stats[partner]['matches'] += 1
                 if won:
@@ -2905,13 +2922,13 @@ def research_me():
         }
     # --- Trends (win/loss streaks, etc.) ---
     trends = {}
-    player_matches = [m for m in all_matches if player_name in [m.get('Home Player 1'), m.get('Home Player 2'), m.get('Away Player 1'), m.get('Away Player 2')]]
+    player_matches = [m for m in all_matches if normalize(player_name) in [normalize(m.get('Home Player 1', '')), normalize(m.get('Home Player 2', '')), normalize(m.get('Away Player 1', '')), normalize(m.get('Away Player 2', ''))]]
     streak = 0
     max_win_streak = 0
     max_loss_streak = 0
     last_result = None
     for match in sorted(player_matches, key=lambda x: x.get('Date', '')):
-        is_home = player_name in [match.get('Home Player 1'), match.get('Home Player 2')]
+        is_home = (normalize(player_name) in [normalize(match.get('Home Player 1', '')), normalize(match.get('Home Player 2', ''))])
         won = (is_home and match.get('Winner') == 'home') or (not is_home and match.get('Winner') == 'away')
         if won:
             if last_result == 'W':
