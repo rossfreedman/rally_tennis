@@ -104,7 +104,7 @@
             {% for court_num in range(1, 9) %}
                 {% set court = 'court' + court_num|string %}
                 {% set stats = analyze_data.court_analysis.get(court) %}
-                {% if stats and stats.matches and stats.matches > 0 %}
+                {% if stats and stats.record and stats.record != '0-0' %}
                 <div class="court-analysis-card flex flex-col items-start p-4 mb-3">
                   <div class="flex items-center gap-2 mb-2 w-full">
                     <i class="fas fa-table-tennis text-black"></i>
