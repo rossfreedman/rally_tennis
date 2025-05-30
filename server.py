@@ -3161,7 +3161,7 @@ def serve_mobile_myteam():
                 day_matches_sorted = sorted(day_matches, key=lambda m: (m.get('Home Team', ''), m.get('Away Team', '')))
                 for i, match in enumerate(day_matches_sorted):
                     court_num = i + 1
-                    # Skip matches beyond court 4 to prevent KeyError
+                    # Skip matches beyond court 8 to prevent KeyError
                     if court_num > 8:
                         continue
                     court_key = f'court{court_num}'
@@ -3506,7 +3506,7 @@ def mobile_teams_players():
         day_matches_sorted = sorted(day_matches, key=lambda m: (m.get('Home Team', ''), m.get('Away Team', '')))
         for i, match in enumerate(day_matches_sorted):
             court_num = i + 1
-            # Skip matches beyond court 4 to prevent KeyError
+            # Skip matches beyond court 8 to prevent KeyError
             if court_num > 8:
                 continue
             court_key = f'court{court_num}'

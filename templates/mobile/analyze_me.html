@@ -104,7 +104,7 @@
             {% for court_num in range(1, 9) %}
                 {% set court = 'court' + court_num|string %}
                 {% set stats = analyze_data.court_analysis.get(court) %}
-                {% if stats and stats.record and stats.record != '0-0' %}
+                {% if court_num <= 5 or (stats and stats.record and stats.record != '0-0') %}
                 <div class="court-analysis-card flex flex-col items-start p-4 mb-3">
                   <div class="flex items-center gap-2 mb-2 w-full">
                     <i class="fas fa-table-tennis text-black"></i>
@@ -119,18 +119,18 @@
                         {% elif stats and stats.winRate is defined and stats.winRate is not none %}bg-red-100 text-red-700
                         {% else %}bg-gray-200 text-gray-500
                         {% endif %}">
-                        {{ stats.winRate|round(1, 'common') if stats and stats.winRate is not string else stats.winRate if stats else 'N/A' }}%
+                        {% if stats and stats.winRate is defined and stats.winRate is not none %}{{ stats.winRate|round(1, 'common') }}%{% else %}N/A{% endif %}
                       </span>
                     </div>
                     <div class="flex justify-between items-center mb-1">
                       <span class="font-semibold text-gray-700">Record</span>
-                      <span class="text-gray-900 font-semibold">{{ stats.record if stats else 'N/A' }}</span>
+                      <span class="text-gray-900 font-semibold">{{ stats.record if stats and stats.record else '0-0' }}</span>
                     </div>
                   </div>
                   <div class="w-full mt-2">
                     <span class="font-semibold text-gray-700 block mb-1">Top Partners</span>
                     <ul class="partner-list space-y-1">
-                      {% if stats and stats.topPartners %}
+                      {% if stats and stats.topPartners and stats.topPartners|length > 0 %}
                         {% for p in stats.topPartners %}
                           <li class="flex flex-col items-start">
                             <span class="partner-name">{{ p.name }}</span>
