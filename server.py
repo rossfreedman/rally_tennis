@@ -2512,7 +2512,7 @@ def get_player_analysis(user):
             player_matches.append(m)
             print(f"[DEBUG] Found match for {player_name}: {m.get('Date')} vs {match_players}")
 
-    # --- 4. Assign matches to courts 1-4 by date and team pairing (CORRECTED LOGIC) ---
+    # --- 4. Assign matches to courts dynamically by date and team pairing ---
     matches_by_group = defaultdict(list)
     for match in all_matches:
         date = match.get('Date') or match.get('date')
@@ -2521,7 +2521,8 @@ def get_player_analysis(user):
         group_key = (date, home_team, away_team)
         matches_by_group[group_key].append(match)
 
-    court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'partners': Counter()} for i in range(1, 5)}
+    # Initialize courts dynamically - support up to 8 courts
+    court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'partners': Counter()} for i in range(1, 9)}
     total_matches = 0
     wins = 0
     losses = 0
@@ -2532,8 +2533,8 @@ def get_player_analysis(user):
         day_matches_sorted = sorted(day_matches, key=lambda m: (m.get('Home Team', ''), m.get('Away Team', '')))
         for i, match in enumerate(day_matches_sorted):
             court_num = i + 1
-            # Skip matches beyond court 4 to prevent KeyError
-            if court_num > 4:
+            # Support up to 8 courts instead of limiting to 4
+            if court_num > 8:
                 continue
             court_key = f'court{court_num}'
             if not any(normalize(mp) == player_name_normal for mp in [
@@ -2802,7 +2803,7 @@ def research_me():
         }
     # --- Compute court analysis (NEW LOGIC) ---
     from collections import defaultdict, Counter
-    court_analysis = {str(i): {'winRate': 0, 'record': '0-0', 'topPartners': []} for i in range(1, 5)}
+    court_analysis = {str(i): {'winRate': 0, 'record': '0-0', 'topPartners': []} for i in range(1, 9)}
     # Step 1: Group matches by (date, series)
     matches_by_date_series = defaultdict(list)
     for match in all_matches:
@@ -2840,7 +2841,7 @@ def research_me():
                 player_court_matches[court_num].append(match)
                 print(f"  [DEBUG] Player found on {date} series {series} court {court_num}: {players}")
     # Step 3: For each court, calculate stats
-    for court_num in ['1', '2', '3', '4']:
+    for court_num in ['1', '2', '3', '4', '5', '6', '7', '8']:
         matches = player_court_matches.get(court_num, [])
         if not matches:
             continue
@@ -3153,7 +3154,7 @@ def serve_mobile_myteam():
                 if match.get('Home Team') == matched_team_name or match.get('Away Team') == matched_team_name:
                     matches_by_date[match['Date']].append(match)
             # Court stats and player stats
-            court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'players': Counter()} for i in range(1, 5)}
+            court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'players': Counter()} for i in range(1, 9)}
             player_stats = {}
             for date, day_matches in matches_by_date.items():
                 # Sort matches for deterministic court assignment
@@ -3161,7 +3162,7 @@ def serve_mobile_myteam():
                 for i, match in enumerate(day_matches_sorted):
                     court_num = i + 1
                     # Skip matches beyond court 4 to prevent KeyError
-                    if court_num > 4:
+                    if court_num > 8:
                         continue
                     court_key = f'court{court_num}'
                     is_home = match.get('Home Team') == matched_team_name
@@ -3194,7 +3195,7 @@ def serve_mobile_myteam():
                         player_stats[valid_players[0]]['partners'][valid_players[1]] += 1
                         player_stats[valid_players[1]]['partners'][valid_players[0]] += 1
             # Build court_analysis
-            for i in range(1, 5):
+            for i in range(1, 9):
                 court_key = f'court{i}'
                 stat = court_stats[court_key]
                 matches = stat['matches']
@@ -3428,7 +3429,7 @@ def mobile_teams_players():
     three_set_losses = 0
     
     # Court analysis tracking
-    court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'players': Counter()} for i in range(1, 5)}
+    court_stats = {f'court{i}': {'matches': 0, 'wins': 0, 'losses': 0, 'players': Counter()} for i in range(1, 9)}
     matches_by_date = defaultdict(list)
     
     for match in team_matches:
@@ -3506,7 +3507,7 @@ def mobile_teams_players():
         for i, match in enumerate(day_matches_sorted):
             court_num = i + 1
             # Skip matches beyond court 4 to prevent KeyError
-            if court_num > 4:
+            if court_num > 8:
                 continue
             court_key = f'court{court_num}'
             
@@ -3688,9 +3689,9 @@ def calculate_team_analysis(team_stats, team_matches, team):
     }
     # Court Analysis (desktop logic)
     court_analysis = {}
-    for i in range(1, 5):
+    for i in range(1, 9):
         court_name = f'Court {i}'
-        court_matches = [m for idx, m in enumerate(team_matches) if (idx % 4) + 1 == i]
+        court_matches = [m for idx, m in enumerate(team_matches) if (idx % 8) + 1 == i]
         wins = losses = 0
         player_win_counts = {}
         for match in court_matches:
@@ -3752,7 +3753,7 @@ def calculate_team_analysis(team_stats, team_matches, team):
             if team_won:
                 player_stats[player]['wins'] += 1
             # Court
-            court_idx = team_matches.index(match) % 4 + 1
+            court_idx = team_matches.index(match) % 8 + 1
             court = f'Court {court_idx}'
             if court not in player_stats[player]['courts']:
                 player_stats[player]['courts'][court] = {'matches': 0, 'wins': 0}
@@ -4452,7 +4453,7 @@ def get_enhanced_streaks():
                     total_losses += 1
                 
                 # Update court stats
-                court_num = matches_sorted.index(match) % 4 + 1
+                court_num = matches_sorted.index(match) % 8 + 1
                 court_key = f'Court {court_num}'
                 court_stats[court_key]['matches'] += 1
                 if won:

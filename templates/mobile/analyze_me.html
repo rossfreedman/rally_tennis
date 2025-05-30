@@ -97,17 +97,18 @@
         </div>
     </div>
     
-    <!-- Court Analysis (2x2 grid) -->
+    <!-- Court Analysis (responsive grid) -->
     <div class='analyze-card'>
         <div class='analyze-card-header'><i class='fas fa-table-tennis'></i> Court Analysis</div>
-        <div class='grid grid-cols-2 gap-3'>
-            {% set court_order = ['court1', 'court2', 'court3', 'court4'] %}
-            {% for court in court_order %}
+        <div class='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3'>
+            {% for court_num in range(1, 9) %}
+                {% set court = 'court' + court_num|string %}
                 {% set stats = analyze_data.court_analysis.get(court) %}
+                {% if stats and stats.matches and stats.matches > 0 %}
                 <div class="court-analysis-card flex flex-col items-start p-4 mb-3">
                   <div class="flex items-center gap-2 mb-2 w-full">
                     <i class="fas fa-table-tennis text-black"></i>
-                    <span class="font-bold text-lg text-black">{{ court|capitalize }}</span>
+                    <span class="font-bold text-lg text-black">Court {{ court_num }}</span>
                   </div>
                   <div class="w-full mb-2">
                     <div class="flex justify-between items-center mb-1">
@@ -152,6 +153,7 @@
                     </ul>
                   </div>
                 </div>
+                {% endif %}
             {% endfor %}
         </div>
     </div>
