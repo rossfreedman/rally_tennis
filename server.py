@@ -1021,6 +1021,8 @@ def get_all_substitute_players():
         user_series = session['user'].get('series')
         user_club = session['user'].get('club')
         
+        print(f"DEBUG: Finding subs for user in series '{user_series}' at club '{user_club}'")
+        
         if not user_series:
             return jsonify({'error': 'User series not found'}), 400
             
@@ -1031,6 +1033,8 @@ def get_all_substitute_players():
             
         user_series_num = int(match.group(1))
         user_series_letter = match.group(2) if match.group(2) else None
+        
+        print(f"DEBUG: User series parsed as number={user_series_num}, letter='{user_series_letter}'")
         
         # Load all players
         players_data = read_all_player_data()
@@ -1053,19 +1057,24 @@ def get_all_substitute_players():
             player_series_num = int(series_match.group(1))
             player_series_letter = series_match.group(2) if series_match.group(2) else None
             
-            # Check if this player is from a higher series
+            # Check if this player is from a higher series (HIGHER numbers = HIGHER skill)
             is_higher_series = False
             
             if player_series_num > user_series_num:
-                # Clear case: Series 3 > Series 2
+                # Clear case: Series 3 > Series 2 (higher number = higher skill)
                 is_higher_series = True
-            elif player_series_num == user_series_num and user_series_letter and player_series_letter:
-                # Same number but different letter: Series 2B vs Series 2A
-                if user_series_letter == 'B' and player_series_letter == 'A':
+                print(f"DEBUG: {player['First Name']} {player['Last Name']} - Higher series by number: {player_series_num} > {user_series_num}")
+            elif player_series_num == user_series_num:
+                # Same number - check letters
+                if user_series_letter and player_series_letter:
+                    # Both have letters: A < B < C, etc. (but we want higher letters for subs)
+                    if player_series_letter > user_series_letter:
+                        is_higher_series = True
+                        print(f"DEBUG: {player['First Name']} {player['Last Name']} - Higher series by letter: {player_series_letter} > {user_series_letter}")
+                elif not user_series_letter and player_series_letter:
+                    # User has no letter (e.g., 2), player has letter (e.g., 2A) - Series 2A > Series 2
                     is_higher_series = True
-            elif player_series_num == user_series_num and user_series_letter and not player_series_letter:
-                # Series 2B user looking at Series 2 (no letter) - Series 2 is higher than Series 2B
-                is_higher_series = True
+                    print(f"DEBUG: {player['First Name']} {player['Last Name']} - Higher series (letter vs no letter): Series {player_series_num}{player_series_letter} > Series {user_series_num}")
             
             if is_higher_series:
                 # Format player data in the same structure as regular players endpoint
@@ -1082,7 +1091,9 @@ def get_all_substitute_players():
                 if 'Preferred Courts' in player:
                     player_data['preferredCourts'] = player['Preferred Courts']
                 eligible_players.append(player_data)
+                print(f"DEBUG: Added substitute: {player_name} from {player_series}")
         
+        print(f"DEBUG: Found {len(eligible_players)} eligible substitute players")
         return jsonify(eligible_players)
         
     except Exception as e:
