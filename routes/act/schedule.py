@@ -86,16 +86,21 @@ def get_matches_for_user_club(user):
                 away_team = match.get('away_team', '')
                 match_type = match.get('type', '')
                 
-                # Include practices (series = "All") for all users
-                if match_series == "All" and match_type == "Practice":
-                    print(f"Found practice session: {match.get('description', 'Team Practice')}")
+                # Include practices for the user's series OR "All" series
+                is_practice_for_user = (
+                    (match_series == "All" and match_type == "Practice") or  # Existing logic for "All" practices
+                    (match_series == user_series and match_type == "Practice")  # New logic for series-specific practices
+                )
+                
+                if is_practice_for_user:
+                    print(f"Found practice session for {match_series}: {match.get('description', 'Team Practice')}")
                     practice_location = match.get('location', user_club)
                     practice_address = get_club_address(practice_location)
                     
                     normalized_match = {
                         'date': match.get('date', ''),
                         'time': match.get('time', ''),
-                        'location': practice_location,  # Use user's club as default location
+                        'location': practice_location,
                         'location_address': practice_address,
                         'home_team': user_club,  # Set user's club as home team for practices
                         'away_team': '',
