@@ -4791,9 +4791,11 @@ def get_matches_for_user_club(user):
                 if match.get('type') == 'Practice' or 'Practice' in match:
                     # For practices, add if it's for all clubs or at the user's specific club
                     practice_location = match.get('location', '')
+                    practice_series = match.get('series', '')
                     if (practice_location == user_club or 
                         practice_location == 'All Clubs' or 
-                        match.get('series') == 'All'):
+                        practice_series == 'All' or
+                        practice_series == user_series):  # Add support for series-specific practices
                         # For "All Clubs" practices, show the user's club as the location
                         display_location = user_club if practice_location == 'All Clubs' else practice_location
                         

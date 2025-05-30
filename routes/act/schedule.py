@@ -18,11 +18,13 @@ def get_matches_for_user_club(user):
         # Get user's club and series
         user_club = user.get('club')
         user_series = user.get('series')
+        print(f"DEBUG AVAILABILITY: User data - club: '{user_club}', series: '{user_series}'")
         if not user_club or not user_series:
             print("Missing club or series in user data")
             return []
             
         print(f"Looking for matches for club: {user_club}, series: {user_series}")
+        print(f"DEBUG: Total entries in schedules.json: {len(all_matches)}")
         
         # Get club addresses from database
         from utils.db import execute_query
@@ -86,6 +88,10 @@ def get_matches_for_user_club(user):
                 away_team = match.get('away_team', '')
                 match_type = match.get('type', '')
                 
+                # DEBUG: Log all practice entries we find
+                if match_type == 'Practice':
+                    print(f"DEBUG: Found practice entry - series: '{match_series}', user_series: '{user_series}', location: '{match.get('location', '')}', description: '{match.get('description', '')}'")
+                
                 # Include practices for the user's series OR "All" series
                 is_practice_for_user = (
                     (match_series == "All" and match_type == "Practice") or  # Existing logic for "All" practices
@@ -108,6 +114,7 @@ def get_matches_for_user_club(user):
                         'description': match.get('description', 'Team Practice')
                     }
                     filtered_matches.append(normalized_match)
+                    print(f"DEBUG: Added practice to filtered_matches: {normalized_match}")
                     continue
                 
                 # For actual matches, only include matches where the user's club is actually playing
