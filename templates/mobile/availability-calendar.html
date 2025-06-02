@@ -700,7 +700,7 @@ function openDateModal(date, dayData) {
             const isMatch = match.type.toLowerCase() !== 'practice';
             matchDiv.innerHTML = `
                 <div class="flex items-center gap-2 mb-2">
-                    <i class="fas fa-${isMatch ? 'trophy' : 'tennis-ball'} text-lg"></i>
+                    <i class="fas fa-${isMatch ? 'trophy' : 'table-tennis'} text-lg ${isMatch ? '' : 'text-black'}"></i>
                     <span class="font-medium">${isMatch ? 'Match' : 'Practice'}</span>
                 </div>
                 ${match.time ? `<div class="text-sm text-gray-600 mb-2">${match.time}</div>` : ''}

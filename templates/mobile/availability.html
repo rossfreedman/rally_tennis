@@ -29,13 +29,13 @@
             {% if match.date != last_date %}
                 {% if not loop.first %}</div>{% endif %}
                 {% set show_time = match.time|strip_leading_zero if match.time else '' %}
+                {% set is_practice = match.type == 'Practice' %}
                 <div class="schedule-date-group" data-date="{{ match.date }}">
-                  <div class="schedule-date-header flex justify-between items-center">
+                  <div class="schedule-date-header flex justify-between items-center {% if is_practice %}bg-yellow-400 text-black{% else %}bg-black text-white{% endif %}">
                     <span>{{ match.date | pretty_date }} at {{ show_time }}</span>
                   </div>
                 {% set last_date = match.date %}
             {% endif %}
-            {% set is_practice = match.type == 'practice' %}
             <div class="schedule-card group relative overflow-hidden mb-4 p-4 bg-white rounded-lg shadow-sm"
                 data-type="{% if is_practice %}practice{% else %}match{% endif %}">
                 <!-- Two Column Layout -->
@@ -278,10 +278,8 @@ async function updateAvailability(button, playerName, date, status) {
 }
 
 .schedule-date-header {
-    background: #000000;
     padding: 0.75rem 1rem;
     font-weight: 500;
-    color: #ffffff;
     margin-bottom: 0.5rem;
     border-radius: 0.375rem;
 }
