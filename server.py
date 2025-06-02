@@ -31,6 +31,8 @@ from routes.act import init_act_routes
 from routes.admin import admin_bp
 from routes.act.availability import update_player_availability, get_player_availability
 from utils.date_utils import date_to_db_timestamp
+from utils.auth import login_required
+from utils.match_utils import get_matches_for_user_club
 
 def is_public_file(path):
     """Check if a file should be publicly accessible without authentication"""
@@ -201,7 +203,6 @@ CORS(app,
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Login required decorator
 from utils.auth import login_required
 
 def read_all_player_data():

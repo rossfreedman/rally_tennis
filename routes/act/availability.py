@@ -5,12 +5,9 @@ import json
 import traceback
 from database_utils import execute_query, execute_query_one
 from utils.logging import log_user_activity
-from routes.act.schedule import get_matches_for_user_club
 from utils.auth import login_required
+from utils.match_utils import get_matches_for_user_club
 import pytz
-
-# Define the application timezone
-APP_TIMEZONE = pytz.timezone('America/Chicago')
 
 # Import our new date verification utilities
 from utils.date_verification import (
@@ -21,6 +18,9 @@ from utils.date_verification import (
 
 # Import the correct date utility function
 from utils.date_utils import date_to_db_timestamp
+
+# Define the application timezone
+APP_TIMEZONE = pytz.timezone('America/Chicago')
 
 def normalize_date_for_db(date_input, target_timezone='UTC'):
     """
@@ -610,6 +610,78 @@ def init_availability_routes(app):
                                  match_avail_pairs=match_avail_pairs,
                                  players=[{'name': player_name}]  # Also pass directly to template
                                  )
+
+    @app.route('/mobile/availability-calendar', methods=['GET'])
+    @login_required
+    def mobile_availability_calendar():
+        """Handle mobile availability calendar view"""
+        try:
+            user = session.get('user')
+            if not user:
+                return jsonify({'error': 'No user in session'}), 400
+            
+            # Always get the most current user data from database to ensure correct series
+            current_user = execute_query_one(
+                """
+                SELECT u.id, u.email, u.first_name, u.last_name,
+                       c.name as club_name, s.name as series_name
+                FROM users u
+                JOIN clubs c ON u.club_id = c.id
+                JOIN series s ON u.series_id = s.id
+                WHERE u.email = %(email)s
+                """,
+                {'email': user['email']}
+            )
+            
+            if not current_user:
+                return jsonify({'error': 'User not found in database'}), 400
+            
+            # Update session with current data
+            session['user'].update({
+                'club': current_user['club_name'],
+                'series': current_user['series_name']
+            })
+            user = session['user']  # Use updated session data
+            
+            player_name = f"{user['first_name']} {user['last_name']}"
+            series = user['series']
+
+            print(f"\n=== CALENDAR ROUTE DEBUG ===")
+            print(f"User: {user}")
+            print(f"Player name: {player_name}")
+            print(f"Series: {series}")
+
+            # Get matches for the user's club/series
+            matches = get_matches_for_user_club(user)
+            print(f"Matches loaded: {len(matches)} matches")
+            for i, match in enumerate(matches):
+                print(f"  Match {i}: {match}")
+            
+            # Get this user's availability for each match
+            availability = get_user_availability(player_name, matches, series)
+            print(f"Availability loaded: {len(availability)} availability records")
+            for i, avail in enumerate(availability):
+                print(f"  Availability {i}: {avail}")
+
+            session_data = {
+                'user': user,
+                'authenticated': True,
+                'matches': matches,
+                'availability': availability,
+                'players': [{'name': player_name}]
+            }
+            
+            print(f"Session data keys: {list(session_data.keys())}")
+            print(f"=== END CALENDAR ROUTE DEBUG ===\n")
+            
+            return render_template('mobile/availability-calendar.html', 
+                                 session_data=session_data
+                                 )
+            
+        except Exception as e:
+            print(f"ERROR in mobile_availability_calendar: {str(e)}")
+            print(traceback.format_exc())
+            return f"Error: {str(e)}", 500
 
     @app.route('/api/availability', methods=['GET', 'POST'])
     @login_required
