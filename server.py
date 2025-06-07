@@ -154,6 +154,9 @@ app.register_blueprint(training_data_bp)
 # Initialize ACT routes
 init_act_routes(app)
 
+# Initialize ANALYZE routes - COMMENTED OUT DUE TO ROUTE CONFLICTS
+# init_analyze_routes(app)
+
 # Configure CORS for admin routes
 CORS(app, resources={
     r"/admin/*": {
@@ -3972,7 +3975,24 @@ def my_club():
             return jsonify({'error': 'Not authenticated'}), 401
 
         club = user.get('club')
-        matches_data = get_recent_matches_for_user_club(user)
+        print(f"\n=== MY CLUB ENDPOINT ===")
+        print(f"User club: {club}")
+        print(f"Using get_all_club_teams_matches function")
+        
+        matches_data = get_all_club_teams_matches(user)
+        print(f"Found {len(matches_data)} matches for all teams at {club}")
+        
+        # Debug: Show which teams were found
+        teams_found = set()
+        for match in matches_data:
+            home_team = match['home_team']
+            away_team = match['away_team']
+            if home_team.startswith(club + ' ') or home_team == club:
+                teams_found.add(home_team)
+            if away_team.startswith(club + ' ') or away_team == club:
+                teams_found.add(away_team)
+        print(f"Teams found for {club}: {list(teams_found)}")
+        print("=" * 50)
         
         if not matches_data:
             return render_template(
@@ -3990,13 +4010,15 @@ def my_club():
             home_team = match['home_team']
             away_team = match['away_team']
             
-            if club in home_team:
+            # Check if home team belongs to user's club
+            if home_team.startswith(club + ' ') or home_team == club:
                 team = home_team
-                opponent = away_team.split(' - ')[0]
+                opponent = away_team.split(' - ')[0] if ' - ' in away_team else away_team.split(' ')[0]
                 is_home = True
-            elif club in away_team:
+            # Check if away team belongs to user's club
+            elif away_team.startswith(club + ' ') or away_team == club:
                 team = away_team
-                opponent = home_team.split(' - ')[0]
+                opponent = home_team.split(' - ')[0] if ' - ' in home_team else home_team.split(' ')[0]
                 is_home = False
             else:
                 continue
@@ -4073,7 +4095,8 @@ def my_club():
             
         tennaqua_standings = []
         for team_stats in stats_data:
-            if not team_stats.get('team', '').startswith('Tennaqua'):
+            team_name = team_stats.get('team', '')
+            if not (team_name.startswith(club + ' ') or team_name == club):
                 continue
                 
             series = team_stats.get('series')
@@ -4092,15 +4115,17 @@ def my_club():
             # Sort by average points
             series_teams.sort(key=lambda x: x.get('avg_points', 0), reverse=True)
             
-            # Find Tennaqua's position
+            # Find club's position
             for i, team in enumerate(series_teams, 1):
-                if team.get('team', '').startswith('Tennaqua'):
+                team_name = team.get('team', '')
+                if team_name.startswith(club + ' ') or team_name == club:
                     tennaqua_standings.append({
                         'series': series,
                         'place': i,
                         'total_points': team.get('points', 0),
                         'avg_points': team.get('avg_points', 0),
-                        'playoff_contention': i <= 8
+                        'playoff_contention': i <= 8,
+                        'team_name': team_name  # Add team name to distinguish multiple teams
                     })
                     break
                     
@@ -4117,11 +4142,13 @@ def my_club():
             if not all([home_team, away_team, winner]):
                 continue
                 
-            if club in home_team:
-                opponent = away_team.split(' - ')[0]
+            # Check if home team belongs to user's club
+            if home_team.startswith(club + ' ') or home_team == club:
+                opponent = away_team.split(' - ')[0] if ' - ' in away_team else away_team.split(' ')[0]
                 won = winner == 'home'
-            elif club in away_team:
-                opponent = home_team.split(' - ')[0]
+            # Check if away team belongs to user's club
+            elif away_team.startswith(club + ' ') or away_team == club:
+                opponent = home_team.split(' - ')[0] if ' - ' in home_team else home_team.split(' ')[0]
                 won = winner == 'away'
             else:
                 continue
@@ -4698,6 +4725,117 @@ def get_recent_matches_for_user_club(user):
         
     except Exception as e:
         print(f"Error getting recent matches for user club: {e}")
+        return []
+
+def get_all_club_teams_matches(user):
+    """
+    Get the most recent matches for ALL teams at a user's club.
+    
+    Args:
+        user: User object containing club information
+        
+    Returns:
+        List of match dictionaries from match_history.json filtered for all teams at the user's club,
+        including the most recent matches for each team (even if they played on different dates)
+    """
+    try:
+        with open('data/match_history.json', 'r') as f:
+            all_matches = json.load(f)
+            
+        if not user or not user.get('club'):
+            return []
+            
+        user_club = user['club']
+        # Filter matches where ANY team from user's club is either home or away team
+        # This includes checking if the club name appears at the start of team names
+        club_matches = []
+        for match in all_matches:
+            home_team = match.get('Home Team', '')
+            away_team = match.get('Away Team', '')
+            
+            # Check if either team starts with the user's club name
+            # This catches all series/teams at the club (e.g., "Tennaqua S2A", "Tennaqua S3B", etc.)
+            is_club_match = (home_team.startswith(user_club + ' ') or 
+                            away_team.startswith(user_club + ' ') or
+                            home_team == user_club or 
+                            away_team == user_club)
+            
+            if is_club_match:
+                # Normalize keys to snake_case
+                normalized_match = {
+                    'date': match.get('Date', ''),
+                    'time': match.get('Time', ''),
+                    'location': match.get('Location', ''),
+                    'home_team': home_team,
+                    'away_team': away_team,
+                    'winner': match.get('Winner', ''),
+                    'scores': match.get('Scores', ''),
+                    'home_player_1': match.get('Home Player 1', ''),
+                    'home_player_2': match.get('Home Player 2', ''),
+                    'away_player_1': match.get('Away Player 1', ''),
+                    'away_player_2': match.get('Away Player 2', ''),
+                    'court': match.get('Court', '')
+                }
+                club_matches.append(normalized_match)
+        
+        if not club_matches:
+            return []
+        
+        # Group matches by team and find the most recent date for each team
+        from datetime import datetime
+        team_matches = {}
+        
+        for match in club_matches:
+            home_team = match['home_team']
+            away_team = match['away_team']
+            
+            # Determine which team belongs to our club
+            if home_team.startswith(user_club + ' ') or home_team == user_club:
+                team_name = home_team
+            elif away_team.startswith(user_club + ' ') or away_team == user_club:
+                team_name = away_team
+            else:
+                continue
+                
+            if team_name not in team_matches:
+                team_matches[team_name] = []
+            team_matches[team_name].append(match)
+        
+        # For each team, get only matches from their most recent date
+        all_recent_matches = []
+        for team_name, matches in team_matches.items():
+            # Sort matches by date for this team
+            sorted_team_matches = sorted(matches, key=lambda x: datetime.strptime(x['date'], '%d-%b-%y'), reverse=True)
+            
+            # Get the most recent date for this team
+            most_recent_date = sorted_team_matches[0]['date']
+            
+            # Get all matches from that date for this team
+            recent_team_matches = [m for m in sorted_team_matches if m['date'] == most_recent_date]
+            
+            all_recent_matches.extend(recent_team_matches)
+        
+        # Sort all matches by date (most recent first), then by court number
+        def sort_key(match):
+            try:
+                date_obj = datetime.strptime(match['date'], '%d-%b-%y')
+                court = match.get('court', '')
+                if not court or not str(court).strip():
+                    court_num = float('inf')  # Put empty courts at the end
+                else:
+                    try:
+                        court_num = int(court)
+                    except (ValueError, TypeError):
+                        court_num = float('inf')  # Put non-numeric courts at the end
+                return (-date_obj.timestamp(), court_num)  # Negative for reverse date order
+            except Exception:
+                return (0, float('inf'))
+        
+        all_recent_matches.sort(key=sort_key)
+        return all_recent_matches
+        
+    except Exception as e:
+        print(f"Error getting all club teams matches: {e}")
         return []
 
 def get_matches_for_user_club(user):
@@ -6193,6 +6331,89 @@ def pretty_date_no_year(value):
     except Exception as e:
         print(f"[PRETTY_DATE_NO_YEAR] Error formatting date: {e}")
         return str(value)
+
+@app.route('/debug/my-club')
+@login_required
+def debug_my_club():
+    try:
+        user = session.get('user')
+        if not user:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        club = user.get('club')
+        print(f"\n=== Debug My Club ===")
+        print(f"User club: {club}")
+        
+        # Test the new function
+        matches_data = get_all_club_teams_matches(user)
+        print(f"Found {len(matches_data)} matches for all teams at {club}")
+        
+        # Show team names found
+        teams_found = set()
+        for match in matches_data:
+            home_team = match['home_team']
+            away_team = match['away_team']
+            
+            if home_team.startswith(club + ' ') or home_team == club:
+                teams_found.add(home_team)
+            if away_team.startswith(club + ' ') or away_team == club:
+                teams_found.add(away_team)
+        
+        print(f"Teams found: {list(teams_found)}")
+        
+        return jsonify({
+            'club': club,
+            'matches_count': len(matches_data),
+            'teams_found': list(teams_found),
+            'sample_matches': matches_data[:3] if matches_data else []
+        })
+        
+    except Exception as e:
+        print(f"Error in debug_my_club: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/test-club-teams')
+def test_club_teams():
+    """Test the get_all_club_teams_matches function with sample data"""
+    try:
+        # Create test user data
+        test_user = {'club': 'Tennaqua'}
+        
+        print(f"\n=== TESTING CLUB TEAMS FUNCTION ===")
+        print(f"Test user club: {test_user['club']}")
+        
+        # Test the function
+        matches = get_all_club_teams_matches(test_user)
+        print(f"Found {len(matches)} matches")
+        
+        # Show team names found
+        teams_found = set()
+        for match in matches:
+            home_team = match.get('home_team', '')
+            away_team = match.get('away_team', '')
+            
+            if home_team.startswith('Tennaqua ') or home_team == 'Tennaqua':
+                teams_found.add(home_team)
+            if away_team.startswith('Tennaqua ') or away_team == 'Tennaqua':
+                teams_found.add(away_team)
+        
+        print(f"Teams found: {list(teams_found)}")
+        
+        return jsonify({
+            'test_user': test_user,
+            'matches_found': len(matches),
+            'teams_found': list(teams_found),
+            'sample_matches': matches[:3] if matches else [],
+            'function_used': 'get_all_club_teams_matches'
+        })
+        
+    except Exception as e:
+        print(f"Error in test: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Get port from environment variable or use default
