@@ -278,15 +278,21 @@ def init_routes(app):
                 
                 # Points for each set
                 for set_score in scores:
-                    if '-' in set_score:
-                        our_score, their_score = map(int, set_score.split('-'))
-                        if not is_home:
-                            our_score, their_score = their_score, our_score
-                            
-                        if our_score > their_score:
-                            match_team_points += 1
-                        else:
-                            match_opponent_points += 1
+                    try:
+                        # Handle tiebreak notation like "7-6 [7-5]" by removing brackets
+                        clean_score = set_score.split(' [')[0] if ' [' in set_score else set_score
+                        if '-' in clean_score:
+                            our_score, their_score = map(int, clean_score.split('-'))
+                            if not is_home:
+                                our_score, their_score = their_score, our_score
+                                
+                            if our_score > their_score:
+                                match_team_points += 1
+                            else:
+                                match_opponent_points += 1
+                    except (ValueError, IndexError) as e:
+                        logger.error(f"Warning: Could not parse score '{set_score}': {e}")
+                        continue
                         
                 # Bonus point for match win
                 if (is_home and match['winner'] == 'home') or (not is_home and match['winner'] == 'away'):

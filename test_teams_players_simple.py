@@ -75,10 +75,12 @@ def test_team_analysis():
         match_sets_lost = 0
         
         for score in score_parts:
-            if '-' in score:
-                parts = score.split('-')
-                if len(parts) == 2:
-                    try:
+            try:
+                # Handle tiebreak notation like "7-6 [7-5]" by removing brackets
+                clean_score = score.split(' [')[0] if ' [' in score else score
+                if '-' in clean_score:
+                    parts = clean_score.split('-')
+                    if len(parts) == 2:
                         home_score = int(parts[0])
                         away_score = int(parts[1])
                         
@@ -96,8 +98,9 @@ def test_team_analysis():
                                 match_sets_won += 1
                             else:
                                 match_sets_lost += 1
-                    except ValueError:
-                        pass
+            except (ValueError, IndexError):
+                print(f"Warning: Could not parse score '{score}'")
+                pass
         
         sets_won += match_sets_won
         sets_lost += match_sets_lost
@@ -109,15 +112,17 @@ def test_team_analysis():
             if team_won:
                 three_set_wins += 1
                 # Check for comeback
-                first_score = score_parts[0].split('-')
-                if len(first_score) == 2:
-                    try:
-                        home_first = int(first_score[0])
-                        away_first = int(first_score[1])
-                        if (is_home and home_first < away_first) or (not is_home and away_first < home_first):
-                            comeback_wins += 1
-                    except ValueError:
-                        pass
+                first_score_clean = score_parts[0].split(' [')[0] if ' [' in score_parts[0] else score_parts[0]
+                if '-' in first_score_clean:
+                    first_score = first_score_clean.split('-')
+                    if len(first_score) == 2:
+                        try:
+                            home_first = int(first_score[0])
+                            away_first = int(first_score[1])
+                            if (is_home and home_first < away_first) or (not is_home and away_first < home_first):
+                                comeback_wins += 1
+                        except ValueError:
+                            pass
             else:
                 three_set_losses += 1
     

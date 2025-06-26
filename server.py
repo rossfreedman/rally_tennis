@@ -3457,10 +3457,12 @@ def mobile_teams_players():
         match_sets_lost = 0
         
         for score in scores:
-            if '-' in score:
-                parts = score.split('-')
-                if len(parts) == 2:
-                    try:
+            try:
+                # Handle tiebreak notation like "7-6 [7-5]" by removing brackets
+                clean_score = score.split(' [')[0] if ' [' in score else score
+                if '-' in clean_score:
+                    parts = clean_score.split('-')
+                    if len(parts) == 2:
                         home_score = int(parts[0])
                         away_score = int(parts[1])
                         
@@ -3478,8 +3480,9 @@ def mobile_teams_players():
                                 match_sets_won += 1
                             else:
                                 match_sets_lost += 1
-                    except ValueError:
-                        pass
+            except (ValueError, IndexError):
+                print(f"Warning: Could not parse score '{score}'")
+                pass
         
         sets_won += match_sets_won
         sets_lost += match_sets_lost
@@ -3491,15 +3494,17 @@ def mobile_teams_players():
             if team_won:
                 three_set_wins += 1
                 # Check for comeback (lost first set but won match)
-                first_score = scores[0].split('-')
-                if len(first_score) == 2:
-                    try:
-                        home_first = int(first_score[0])
-                        away_first = int(first_score[1])
-                        if (is_home and home_first < away_first) or (not is_home and away_first < home_first):
-                            comeback_wins += 1
-                    except ValueError:
-                        pass
+                first_score_clean = scores[0].split(' [')[0] if ' [' in scores[0] else scores[0]
+                if '-' in first_score_clean:
+                    first_score = first_score_clean.split('-')
+                    if len(first_score) == 2:
+                        try:
+                            home_first = int(first_score[0])
+                            away_first = int(first_score[1])
+                            if (is_home and home_first < away_first) or (not is_home and away_first < home_first):
+                                comeback_wins += 1
+                        except ValueError:
+                            pass
             else:
                 three_set_losses += 1
     
@@ -3675,12 +3680,17 @@ def calculate_team_analysis(team_stats, team_matches, team):
             if team_won:
                 three_set_wins += 1
                 # Check for comeback win - lost first set but won the match
-                first_set = scores[0].split('-')
-                home_score, away_score = map(int, first_set)
-                if is_home and home_score < away_score:
-                    comeback_wins += 1
-                elif not is_home and away_score < home_score:
-                    comeback_wins += 1
+                first_set_clean = scores[0].split(' [')[0] if ' [' in scores[0] else scores[0]
+                if '-' in first_set_clean:
+                    first_set = first_set_clean.split('-')
+                    try:
+                        home_score, away_score = map(int, first_set)
+                        if is_home and home_score < away_score:
+                            comeback_wins += 1
+                        elif not is_home and away_score < home_score:
+                            comeback_wins += 1
+                    except (ValueError, IndexError):
+                        pass
             else:
                 three_set_losses += 1
     three_set_record = f"{three_set_wins}-{three_set_losses}"
@@ -4039,14 +4049,21 @@ def my_club():
             
             # Points for each set
             for set_score in scores:
-                our_score, their_score = map(int, set_score.split('-'))
-                if not is_home:
-                    our_score, their_score = their_score, our_score
-                    
-                if our_score > their_score:
-                    match_team_points += 1
-                else:
-                    match_opponent_points += 1
+                try:
+                    # Handle tiebreak notation like "7-6 [7-5]" by removing brackets
+                    clean_score = set_score.split(' [')[0] if ' [' in set_score else set_score
+                    if '-' in clean_score:
+                        our_score, their_score = map(int, clean_score.split('-'))
+                        if not is_home:
+                            our_score, their_score = their_score, our_score
+                            
+                        if our_score > their_score:
+                            match_team_points += 1
+                        else:
+                            match_opponent_points += 1
+                except (ValueError, IndexError) as e:
+                    print(f"Warning: Could not parse score '{set_score}': {e}")
+                    continue
                     
             # Bonus point for match win
             if (is_home and match['winner'] == 'home') or (not is_home and match['winner'] == 'away'):
